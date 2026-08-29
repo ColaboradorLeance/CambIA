@@ -5,6 +5,9 @@ target/
 !**/src/main/**/target/
 !**/src/test/**/target/
 
+### Claude Code ###
+.claude/
+
 ### STS ###
 .apt_generated
 .classpath
