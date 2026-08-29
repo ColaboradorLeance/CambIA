@@ -1,0 +1,434 @@
+import { useEffect, useState } from "react";
+import { api } from "../api/client";
+import { useAuth } from "../auth/AuthContext";
+import LoadingState from "../components/LoadingState";
+import EmptyState from "../components/EmptyState";
+import ConfirmModal from "../components/ConfirmModal";
+import CurrencyPicker from "../components/CurrencyPicker";
+import SearchPicker from "../components/SearchPicker";
+import { formatarData } from "../utils/data";
+
+const FORM_VAZIO = {
+	data: "",
+	clienteId: "",
+	bancoId: "",
+	cv: "",
+	prCrVir: "Pronto",
+	moeda: "",
+	valorMe: "",
+	spotAsset: "",
+	nivelamento: "",
+	taxaFinal: "",
+};
+
+const FILTROS_VAZIOS = {
+	data: "",
+	moeda: "",
+	valorMoeda: "",
+	cnpj: "",
+	nome: "",
+};
+
+function formatarMoeda(valor) {
+	if (valor === null || valor === undefined) return "—";
+	return Number(valor).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 6 });
+}
+
+function contemTexto(valor, filtro) {
+	if (!filtro) return true;
+	return (valor || "").toLowerCase().includes(filtro.toLowerCase());
+}
+
+export default function OperacoesPage() {
+	const { usuario } = useAuth();
+	const ehConsultor = usuario?.perfil === "CONSULTOR";
+	const [operacoes, setOperacoes] = useState([]);
+	const [clientes, setClientes] = useState([]);
+	const [bancos, setBancos] = useState([]);
+	const [form, setForm] = useState(FORM_VAZIO);
+	const [filtros, setFiltros] = useState(FILTROS_VAZIOS);
+	const [editandoId, setEditandoId] = useState(null);
+	const [carregando, setCarregando] = useState(true);
+	const [operacaoParaConfirmar, setOperacaoParaConfirmar] = useState(null);
+	const [operacaoParaCancelar, setOperacaoParaCancelar] = useState(null);
+
+	async function carregarTudo() {
+		setCarregando(true);
+		try {
+			if (ehConsultor) {
+				setOperacoes(await api.get("/operacoes"));
+			} else {
+				const [op, cli, ban] = await Promise.all([
+					api.get("/operacoes"),
+					api.get("/clientes"),
+					api.get("/bancos"),
+				]);
+				setOperacoes(op);
+				setClientes(cli);
+				setBancos(ban);
+			}
+		} catch {
+			// erro já mostrado como pop-up pelo api/client.js
+		} finally {
+			setCarregando(false);
+		}
+	}
+
+	useEffect(() => {
+		carregarTudo();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
+
+	async function salvar(evento) {
+		evento.preventDefault();
+		try {
+			const payload = {
+				...form,
+				clienteId: Number(form.clienteId),
+				bancoId: Number(form.bancoId),
+				valorMe: Number(form.valorMe),
+				spotAsset: Number(form.spotAsset),
+				nivelamento: Number(form.nivelamento),
+				taxaFinal: Number(form.taxaFinal),
+			};
+			if (editandoId) {
+				await api.put(`/operacoes/${editandoId}`, payload);
+			} else {
+				await api.post("/operacoes", payload);
+			}
+			cancelarEdicao();
+			carregarTudo();
+		} catch {
+			// erro já mostrado como pop-up pelo api/client.js
+		}
+	}
+
+	function editar(op) {
+		setEditandoId(op.id);
+		setForm({
+			data: op.data,
+			clienteId: String(op.clienteId),
+			bancoId: String(op.bancoId),
+			cv: op.cv,
+			prCrVir: op.prCrVir,
+			moeda: op.moeda,
+			valorMe: String(op.valorMe),
+			spotAsset: String(op.spotAsset),
+			nivelamento: String(op.nivelamento),
+			taxaFinal: String(op.taxaFinal),
+		});
+		window.scrollTo({ top: 0, behavior: "smooth" });
+	}
+
+	function cancelarEdicao() {
+		setEditandoId(null);
+		setForm(FORM_VAZIO);
+	}
+
+	async function mudarStatus(id, status) {
+		try {
+			await api.patch(`/operacoes/${id}/status`, { status });
+			carregarTudo();
+		} catch {
+			// erro já mostrado como pop-up pelo api/client.js
+		}
+	}
+
+	async function confirmarOrdem() {
+		const id = operacaoParaConfirmar.id;
+		setOperacaoParaConfirmar(null);
+		await mudarStatus(id, "CONFIRMADO");
+	}
+
+	async function cancelarOrdem() {
+		const id = operacaoParaCancelar.id;
+		setOperacaoParaCancelar(null);
+		await mudarStatus(id, "CANCELADO");
+	}
+
+	function atualizarFiltro(campo, valor) {
+		setFiltros((atual) => ({ ...atual, [campo]: valor }));
+	}
+
+	const emAndamento = operacoes.filter((op) => op.status === "ANDAMENTO");
+
+	const filtradas = emAndamento.filter((op) => {
+		if (filtros.data && op.data !== filtros.data) return false;
+		if (!contemTexto(op.moeda, filtros.moeda)) return false;
+		if (filtros.valorMoeda && !formatarMoeda(op.valorMe).includes(filtros.valorMoeda)) return false;
+		if (!contemTexto(op.clienteDocumento, filtros.cnpj)) return false;
+		if (!contemTexto(op.clienteNome, filtros.nome)) return false;
+		return true;
+	});
+
+	const algumFiltroAtivo = Object.values(filtros).some((v) => v !== "");
+
+	return (
+		<div>
+			<h1>Ordens</h1>
+			<p className="fechamento-periodo-legenda">
+				Confirmar, editar e registrar ordens de câmbio. Ordens já confirmadas ficam na aba "Confirmadas".
+			</p>
+
+			{!ehConsultor && (
+			<form onSubmit={salvar} className="form-operacao">
+				<label>
+					Data
+					<input
+						type="date"
+						value={form.data}
+						onChange={(e) => setForm({ ...form, data: e.target.value })}
+						disabled={!!editandoId}
+						title={editandoId ? "A data não pode ser alterada depois que a ordem é registrada" : undefined}
+						required
+					/>
+				</label>
+				<label>
+					Cliente
+					<SearchPicker
+						items={clientes.map((c) => ({ id: c.id, label: c.nome }))}
+						value={form.clienteId}
+						onChange={(id) => setForm({ ...form, clienteId: String(id) })}
+						placeholder="Buscar cliente"
+						required
+					/>
+				</label>
+				<label>
+					Banco
+					<SearchPicker
+						items={bancos.map((b) => ({ id: b.id, label: b.nome }))}
+						value={form.bancoId}
+						onChange={(id) => setForm({ ...form, bancoId: String(id) })}
+						placeholder="Buscar banco"
+						required
+					/>
+				</label>
+				<label>
+					C/V
+					<select
+						value={form.cv}
+						onChange={(e) => setForm({ ...form, cv: e.target.value })}
+						required
+					>
+						<option value="" disabled>
+							Selecione
+						</option>
+						<option value="C">C (Compra)</option>
+						<option value="V">V (Venda)</option>
+					</select>
+				</label>
+				<label>
+					Moeda
+					<CurrencyPicker
+						value={form.moeda}
+						onChange={(codigo) => setForm({ ...form, moeda: codigo })}
+						required
+					/>
+				</label>
+				<label>
+					Valor em ME
+					<input
+						type="number"
+						step="0.01"
+						value={form.valorMe}
+						onChange={(e) => setForm({ ...form, valorMe: e.target.value })}
+						required
+					/>
+				</label>
+				<label>
+					Spot Asset
+					<input
+						type="number"
+						step="0.0001"
+						value={form.spotAsset}
+						onChange={(e) => setForm({ ...form, spotAsset: e.target.value })}
+						required
+					/>
+				</label>
+				<label>
+					Nivelamento
+					<input
+						type="number"
+						step="0.0001"
+						value={form.nivelamento}
+						onChange={(e) => setForm({ ...form, nivelamento: e.target.value })}
+						required
+					/>
+				</label>
+				<label>
+					Taxa Final
+					<input
+						type="number"
+						step="0.0001"
+						value={form.taxaFinal}
+						onChange={(e) => setForm({ ...form, taxaFinal: e.target.value })}
+						required
+					/>
+				</label>
+				<button type="submit" className="btn btn-primary">
+					{editandoId ? "Salvar alterações" : "Registrar ordem"}
+				</button>
+				{editandoId && (
+					<button type="button" className="btn btn-secondary" onClick={cancelarEdicao}>
+						Cancelar
+					</button>
+				)}
+			</form>
+			)}
+
+			<div className="relatorio-filtros">
+				<label>
+					Data
+					<input type="date" value={filtros.data} onChange={(e) => atualizarFiltro("data", e.target.value)} />
+				</label>
+				<label>
+					Moeda
+					<input
+						value={filtros.moeda}
+						onChange={(e) => atualizarFiltro("moeda", e.target.value)}
+						placeholder="Todas"
+					/>
+				</label>
+				<label>
+					Valor Moeda
+					<input
+						value={filtros.valorMoeda}
+						onChange={(e) => atualizarFiltro("valorMoeda", e.target.value)}
+						placeholder="Todos"
+					/>
+				</label>
+				<label>
+					CNPJ
+					<input
+						value={filtros.cnpj}
+						onChange={(e) => atualizarFiltro("cnpj", e.target.value)}
+						placeholder="Todos"
+					/>
+				</label>
+				<label>
+					Nome
+					<input
+						value={filtros.nome}
+						onChange={(e) => atualizarFiltro("nome", e.target.value)}
+						placeholder="Todos"
+					/>
+				</label>
+				{algumFiltroAtivo && (
+					<button type="button" className="btn btn-secondary" onClick={() => setFiltros(FILTROS_VAZIOS)}>
+						Limpar filtros
+					</button>
+				)}
+			</div>
+
+			{carregando ? (
+				<LoadingState label="Carregando ordens…" />
+			) : emAndamento.length === 0 ? (
+				<EmptyState
+					title="Nenhuma ordem em andamento"
+					message={
+						ehConsultor
+							? "Nenhuma ordem em andamento no momento."
+							: "Registre uma nova ordem usando o formulário acima, ou veja as já confirmadas na aba \"Confirmadas\"."
+					}
+				/>
+			) : filtradas.length === 0 ? (
+				<EmptyState title="Nenhuma ordem encontrada" message="Ajuste os filtros acima e tente novamente." />
+			) : (
+			<div className="table-card">
+			<table>
+				<thead>
+					<tr>
+						<th>ID do trade</th>
+						<th>Data</th>
+						<th>Cliente</th>
+						<th>CNPJ</th>
+						<th>Banco</th>
+						<th>C/V</th>
+						<th>Tipo</th>
+						<th>Moeda</th>
+						<th>Valor ME</th>
+						<th>Criado por</th>
+						<th></th>
+					</tr>
+				</thead>
+				<tbody>
+					{filtradas.map((op) => (
+						<tr key={op.id}>
+							<td className="mono">{op.idTrade}</td>
+							<td>{formatarData(op.data)}</td>
+							<td>{op.clienteNome || `#${op.clienteId}`}</td>
+							<td>{op.clienteDocumento || "—"}</td>
+							<td>{op.bancoNome || `#${op.bancoId}`}</td>
+							<td>{op.cv}</td>
+							<td>{op.prCrVir}</td>
+							<td>{op.moeda}</td>
+							<td className="mono">{formatarMoeda(op.valorMe)}</td>
+							<td>{op.criadoPorNome || "—"}</td>
+							<td>
+								{!ehConsultor && (
+									<>
+										<button className="btn btn-secondary btn-sm" onClick={() => editar(op)}>
+											Editar
+										</button>{" "}
+										<button
+											className="btn btn-secondary btn-sm"
+											onClick={() => setOperacaoParaConfirmar(op)}
+										>
+											Confirmar
+										</button>{" "}
+										<button
+											className="btn btn-danger btn-sm"
+											onClick={() => setOperacaoParaCancelar(op)}
+										>
+											Cancelar
+										</button>
+									</>
+								)}
+							</td>
+						</tr>
+					))}
+				</tbody>
+			</table>
+		</div>
+		)}
+
+		<ConfirmModal
+			open={operacaoParaConfirmar !== null}
+			title="Confirmar ordem"
+			message={
+				operacaoParaConfirmar && (
+					<>
+						Confirma a ordem <strong>{operacaoParaConfirmar.idTrade}</strong> (
+						{operacaoParaConfirmar.clienteNome}, {operacaoParaConfirmar.moeda}{" "}
+						{formatarMoeda(operacaoParaConfirmar.valorMe)})? Os valores calculados (R$, Total Bruto e
+						Comissão) passam a existir a partir de agora e a ordem não pode voltar para "Em andamento".
+					</>
+				)
+			}
+			confirmLabel="Confirmar"
+			onConfirm={confirmarOrdem}
+			onCancel={() => setOperacaoParaConfirmar(null)}
+		/>
+
+		<ConfirmModal
+			open={operacaoParaCancelar !== null}
+			title="Cancelar ordem"
+			message={
+				operacaoParaCancelar && (
+					<>
+						Confirma cancelar a ordem <strong>{operacaoParaCancelar.idTrade}</strong> (
+						{operacaoParaCancelar.clienteNome}, {operacaoParaCancelar.moeda}{" "}
+						{formatarMoeda(operacaoParaCancelar.valorMe)})? Esta ação não pode ser desfeita — a ordem
+						cancelada não volta para "Em andamento" nem pode ser confirmada depois.
+					</>
+				)
+			}
+			confirmLabel="Cancelar ordem"
+			cancelLabel="Voltar"
+			perigo
+			onConfirm={cancelarOrdem}
+			onCancel={() => setOperacaoParaCancelar(null)}
+		/>
+		</div>
+	);
+}

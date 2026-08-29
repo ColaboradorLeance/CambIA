@@ -1,0 +1,88 @@
+:root {
+	--bg: #f8fafc;
+	--surface: #ffffff;
+	--border: #e2e8f0;
+	--text: #0f172a;
+	--text-secondary: #475569;
+	--text-muted: #94a3b8;
+
+	--accent: #4f46e5;
+	--accent-hover: #4338ca;
+	--accent-soft: #eef2ff;
+
+	--success: #059669;
+	--success-soft: #ecfdf5;
+	--danger: #dc2626;
+	--danger-soft: #fef2f2;
+	--warning: #d97706;
+	--warning-soft: #fef3c7;
+
+	--sidebar-bg: #ffffff;
+	--sidebar-border: #e2e8f0;
+	--sidebar-text: #64748b;
+	--sidebar-text-active: #4f46e5;
+	--sidebar-active-bg: #eef2ff;
+
+	--radius: 12px;
+	--radius-sm: 8px;
+	--shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+	--shadow-md: 0 4px 16px rgba(15, 23, 42, 0.06);
+
+	--sans: "Inter", system-ui, "Segoe UI", Roboto, sans-serif;
+	--mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+
+	font: 14.5px/1.5 var(--sans);
+	color: var(--text);
+	background: var(--bg);
+}
+
+* {
+	box-sizing: border-box;
+}
+
+body {
+	margin: 0;
+}
+
+#root {
+	min-height: 100svh;
+	box-sizing: border-box;
+}
+
+h1 {
+	font-size: 24px;
+	font-weight: 800;
+	letter-spacing: -0.02em;
+	margin: 0 0 4px;
+	color: var(--text);
+}
+
+h2,
+h3 {
+	color: var(--text);
+	letter-spacing: -0.01em;
+}
+
+a {
+	color: var(--accent);
+	text-decoration: none;
+}
+
+a:hover {
+	color: var(--accent-hover);
+}
+
+input,
+select,
+button,
+textarea {
+	font: inherit;
+}
+
+button {
+	cursor: pointer;
+}
+
+code {
+	font-family: var(--mono);
+}

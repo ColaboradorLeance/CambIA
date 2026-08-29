@@ -1,0 +1,61 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: cambia
+      POSTGRES_USER: cambia
+      POSTGRES_PASSWORD: cambia
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cambia"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: .
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/cambia
+      SPRING_DATASOURCE_USERNAME: cambia
+      SPRING_DATASOURCE_PASSWORD: cambia
+      # Envio real do link magico por e-mail (SMTP) - desligado por padrao.
+      # Para habilitar de verdade (relay SMTP do Microsoft 365 / Exchange Online no Azure,
+      # quando o plano estiver disponivel) ou para testar contra o Mailpit deste compose
+      # (ver servico "mailpit" abaixo), defina essas variaveis num arquivo .env (nao
+      # versionado) - veja .env.example para os dois casos.
+      CAMBIA_MAIL_HABILITADO: ${CAMBIA_MAIL_HABILITADO:-false}
+      CAMBIA_MAIL_REMETENTE: ${CAMBIA_MAIL_REMETENTE:-}
+      SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-}
+      SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-587}
+      SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME:-}
+      SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD:-}
+      SPRING_MAIL_SMTP_AUTH: ${SPRING_MAIL_SMTP_AUTH:-true}
+      SPRING_MAIL_SMTP_STARTTLS: ${SPRING_MAIL_SMTP_STARTTLS:-true}
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+  # Servidor SMTP de teste: captura os e-mails enviados pelo backend sem entregar a
+  # ninguem de verdade. Interface web em http://localhost:8025. Util pra testar o envio
+  # real do link magico (CAMBIA_MAIL_HABILITADO=true) antes de ter as credenciais do
+  # relay SMTP definitivo (Microsoft 365 / Exchange Online no Azure) - ver .env.example.
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+
+volumes:
+  db_data:
