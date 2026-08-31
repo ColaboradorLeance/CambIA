@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthContext";
 import { IconLogo, IconArrowRight, IconInfo } from "../components/icons";
+import { APP_VERSION } from "../version";
 
 export default function LoginPage() {
 	const { solicitarLink, verificarToken } = useAuth();
@@ -107,7 +108,7 @@ export default function LoginPage() {
 					)}
 				</div>
 
-				<p className="login-footer">Uso interno · CambIA</p>
+				<p className="login-footer">Uso interno · CambIA · v{APP_VERSION}</p>
 			</div>
 		</div>
 	);

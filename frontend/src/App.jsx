@@ -20,6 +20,7 @@ import HistoricoOperacoesPage from "./pages/HistoricoOperacoesPage";
 import SubNav from "./components/SubNav";
 import ErrorToasts from "./components/ErrorToasts";
 import { IconLogo, IconGrid, IconList, IconCalendarCheck, IconTrend, IconUsers, IconLogout } from "./components/icons";
+import { APP_VERSION } from "./version";
 import "./App.css";
 
 const ROTULOS_PERFIL = {
@@ -108,7 +109,10 @@ function Layout({ children }) {
 					<div className="app-sidebar-brand-mark">
 						<IconLogo size={18} stroke="#fff" />
 					</div>
-					<span className="app-sidebar-brand-name">CambIA</span>
+					<div className="app-sidebar-brand-text">
+						<span className="app-sidebar-brand-name">CambIA</span>
+						<span className="app-sidebar-version">v{APP_VERSION}</span>
+					</div>
 				</div>
 
 				<nav className="app-sidebar-nav">
