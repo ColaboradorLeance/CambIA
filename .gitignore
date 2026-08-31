@@ -8,6 +8,9 @@ target/
 ### Claude Code ###
 .claude/
 
+### Documentação interna (nunca enviar ao repositório remoto) ###
+/docs/
+
 ### STS ###
 .apt_generated
 .classpath
