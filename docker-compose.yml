@@ -41,7 +41,15 @@ services:
         condition: service_healthy
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        # Endereço em que o NAVEGADOR do usuário vai acessar o backend — não é o
+        # endereço interno do container. Em localhost o padrão já funciona; num
+        # servidor real, defina VITE_API_URL no .env (ex: http://SEU_SERVIDOR:8080)
+        # antes de buildar, senão o front-end tenta falar com o localhost de quem
+        # estiver acessando pelo navegador. Ver README.md.
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8080}
     ports:
       - "5173:80"
     depends_on:
