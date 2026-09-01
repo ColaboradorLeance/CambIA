@@ -298,9 +298,21 @@ button:disabled {
 	max-width: 640px;
 }
 
-.campo-aviso {
+.campo-status {
 	margin: -6px 0 0;
 	font-size: 12px;
+}
+
+.campo-status-buscando {
+	color: var(--text-muted);
+}
+
+.campo-status-encontrado {
+	color: var(--success);
+	font-weight: 600;
+}
+
+.campo-status-nao-encontrado {
 	color: var(--text-muted);
 }
 

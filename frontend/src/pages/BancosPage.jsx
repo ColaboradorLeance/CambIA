@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import LoadingState from "../components/LoadingState";
 import EmptyState from "../components/EmptyState";
@@ -11,21 +11,19 @@ const FORM_VAZIO = { codigoBanco: "", sigla: "", nome: "", taxaRebate: "", calcu
 async function buscarNomePorCodigoBanco(codigo) {
 	const somenteDigitos = (codigo || "").replace(/\D/g, "");
 	if (somenteDigitos.length !== 3 && somenteDigitos.length !== 8) {
-		return { nome: null, mensagem: null };
+		return null;
 	}
 	try {
 		const resposta = await api.get(`/bancos/consulta-codigo/${somenteDigitos}`);
 		if (resposta.nome) {
-			return { nome: resposta.nome, mensagem: null };
+			return { tipo: "encontrado", texto: `Encontrado: ${resposta.nome}`, nome: resposta.nome };
 		}
-		const mensagem =
-			somenteDigitos.length === 3
-				? "Este código não participa do COMPE."
-				: "ISPB não encontrado.";
-		return { nome: null, mensagem };
+		const texto =
+			somenteDigitos.length === 3 ? "Este código não participa do COMPE." : "ISPB não encontrado.";
+		return { tipo: "nao-encontrado", texto, nome: null };
 	} catch {
 		// Falha na consulta não deve atrapalhar o preenchimento manual — sem pop-up aqui.
-		return { nome: null, mensagem: null };
+		return null;
 	}
 }
 
@@ -35,7 +33,12 @@ export default function BancosPage() {
 	const [form, setForm] = useState(FORM_VAZIO);
 	const [editandoId, setEditandoId] = useState(null);
 	const [carregando, setCarregando] = useState(true);
-	const [mensagemCodigoBanco, setMensagemCodigoBanco] = useState(null);
+	// null (nada a informar) | { tipo: "buscando" | "encontrado" | "nao-encontrado", texto }
+	const [statusCodigoBanco, setStatusCodigoBanco] = useState(null);
+	// Guarda qual código está sendo buscado no momento, pra descartar uma resposta que
+	// chegou atrasada depois que o usuário já editou o campo de novo (evita que uma
+	// busca antiga sobrescreva o Nome com o banco errado).
+	const codigoEmBuscaRef = useRef(null);
 
 	async function carregar() {
 		setCarregando(true);
@@ -90,15 +93,35 @@ export default function BancosPage() {
 	function cancelarEdicao() {
 		setEditandoId(null);
 		setForm(FORM_VAZIO);
-		setMensagemCodigoBanco(null);
+		setStatusCodigoBanco(null);
+	}
+
+	// Toda edição no Código do banco (inclusive apagar) já limpa o Nome na hora —
+	// garante que o Nome nunca fica associado a um código diferente do que está
+	// digitado no momento. Só volta a ter um Nome depois de uma nova busca (blur).
+	function editarCodigoBanco(valor) {
+		codigoEmBuscaRef.current = null; // invalida qualquer busca em andamento pro código anterior
+		setForm((atual) => ({ ...atual, codigoBanco: valor, nome: "" }));
+		setStatusCodigoBanco(null);
 	}
 
 	async function completarNomePeloCodigoBanco() {
-		const { nome, mensagem } = await buscarNomePorCodigoBanco(form.codigoBanco);
-		if (nome) {
-			setForm((atual) => ({ ...atual, nome }));
+		const somenteDigitos = (form.codigoBanco || "").replace(/\D/g, "");
+		if (somenteDigitos.length !== 3 && somenteDigitos.length !== 8) {
+			codigoEmBuscaRef.current = null;
+			setStatusCodigoBanco(null);
+			return;
 		}
-		setMensagemCodigoBanco(mensagem);
+		codigoEmBuscaRef.current = somenteDigitos;
+		setStatusCodigoBanco({ tipo: "buscando", texto: "Buscando…" });
+		const resultado = await buscarNomePorCodigoBanco(somenteDigitos);
+		if (codigoEmBuscaRef.current !== somenteDigitos) {
+			return; // o campo já mudou de novo enquanto buscava — descarta esse resultado velho
+		}
+		if (resultado?.nome) {
+			setForm((atual) => ({ ...atual, nome: resultado.nome }));
+		}
+		setStatusCodigoBanco(resultado);
 	}
 
 	async function remover(id) {
@@ -125,14 +148,15 @@ export default function BancosPage() {
 				<input
 					placeholder="Código do banco (COMPE ou ISPB)"
 					value={form.codigoBanco}
-					onChange={(e) => {
-						setForm({ ...form, codigoBanco: e.target.value });
-						setMensagemCodigoBanco(null);
-					}}
+					onChange={(e) => editarCodigoBanco(e.target.value)}
 					onBlur={completarNomePeloCodigoBanco}
 					required
 				/>
-				{mensagemCodigoBanco && <p className="campo-aviso">{mensagemCodigoBanco}</p>}
+				{statusCodigoBanco && (
+					<p className={`campo-status campo-status-${statusCodigoBanco.tipo}`}>
+						{statusCodigoBanco.texto}
+					</p>
+				)}
 				<input
 					placeholder="Sigla"
 					value={form.sigla}
