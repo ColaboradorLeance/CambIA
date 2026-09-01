@@ -4,12 +4,14 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 
+import com.cambia.auth.NomesCookieAuth;
 import com.cambia.auth.SessaoRepository;
 import com.cambia.usuario.Usuario;
 import com.cambia.usuario.UsuarioRepository;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -31,14 +33,39 @@ class SessaoAuthenticationFilter extends OncePerRequestFilter {
 		this.usuarioRepository = usuarioRepository;
 	}
 
+	// Achado de revisão de segurança (Fase 3B): aceita o token tanto pelo header
+	// Authorization (esquema original, usado em dev local sem o reverse-proxy HTTPS)
+	// quanto pelo cookie httpOnly de sessão (produção) — os dois continuam funcionando,
+	// nenhum substitui o outro.
 	@Override
 	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
 			throws ServletException, IOException {
-		String header = request.getHeader("Authorization");
-		if (header != null && header.startsWith("Bearer ")) {
-			autenticar(header.substring("Bearer ".length()));
+		String token = extrairTokenDoHeader(request);
+		if (token == null) {
+			token = extrairTokenDoCookie(request);
+		}
+		if (token != null) {
+			autenticar(token);
 		}
 		chain.doFilter(request, response);
+	}
+
+	private String extrairTokenDoHeader(HttpServletRequest request) {
+		String header = request.getHeader("Authorization");
+		return header != null && header.startsWith("Bearer ") ? header.substring("Bearer ".length()) : null;
+	}
+
+	private String extrairTokenDoCookie(HttpServletRequest request) {
+		Cookie[] cookies = request.getCookies();
+		if (cookies == null) {
+			return null;
+		}
+		for (Cookie cookie : cookies) {
+			if (NomesCookieAuth.SESSAO.equals(cookie.getName())) {
+				return cookie.getValue();
+			}
+		}
+		return null;
 	}
 
 	private void autenticar(String token) {

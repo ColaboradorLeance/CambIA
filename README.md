@@ -108,7 +108,7 @@ Depois disso, esse endpoint passa a responder `409 Conflict` — novos usuários
    Vai aparecer algo como `Link mágico para voce@suaempresa.com.br: /auth/verify?token=xxxxxxxx-...`. Copie só o valor depois de `token=`.
 4. Cole esse valor no campo "Token" da tela e clique em "Entrar".
 
-A sessão dura 8 horas (token opaco, sem cookies) e cada link mágico expira em 15 minutos ou no primeiro uso. Tentativas repetidas de login (por e-mail ou por IP) têm um limite — depois de algumas tentativas seguidas, é preciso esperar alguns minutos.
+A sessão dura 8 horas — em produção (via `https://`, atrás do reverse-proxy) fica guardada num cookie `httpOnly`, não acessível por JavaScript; cada link mágico expira em 15 minutos ou no primeiro uso. Tentativas repetidas de login (por e-mail ou por IP) têm um limite — depois de algumas tentativas seguidas, é preciso esperar alguns minutos.
 
 ---
 

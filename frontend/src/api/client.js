@@ -9,14 +9,40 @@ import { mostrarErroGlobal, agendarErroAposRedirecionamento } from "../utils/toa
 // do build do Vite, mas o "??" deixa a intenção clara mesmo assim).
 const API_URL = import.meta.env.VITE_API_URL ?? "";
 
+// Achado de revisão de segurança (Fase 3B): lê um cookie pelo nome, sem depender de
+// nenhuma lib — só usado pro dublê CSRF (XSRF-TOKEN), que é de propósito legível por
+// JavaScript (diferente do cookie de sessão em si, esse sim httpOnly).
+function lerCookie(nome) {
+	const encontrado = document.cookie.split("; ").find((linha) => linha.startsWith(`${nome}=`));
+	return encontrado ? decodeURIComponent(encontrado.split("=").slice(1).join("=")) : null;
+}
+
+// Achado de revisão de segurança (Fase 3B): quando não há token no localStorage (o caso
+// em produção, atrás do reverse-proxy HTTPS — a sessão vive só no cookie httpOnly, nunca
+// em localStorage), a requisição depende do cookie de sessão pra autenticar. Nesse caso,
+// requisições que mudam estado precisam ecoar o cookie XSRF-TOKEN de volta num header —
+// ver CsrfProtectionFilter no backend.
+function cabecalhosDeCsrf(metodo, temTokenNoLocalStorage) {
+	if (temTokenNoLocalStorage || metodo === "GET") {
+		return {};
+	}
+	const tokenCsrf = lerCookie("XSRF-TOKEN");
+	return tokenCsrf ? { "X-XSRF-TOKEN": tokenCsrf } : {};
+}
+
 async function request(path, options = {}) {
-	const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
 	const token = localStorage.getItem("sessionToken");
+	const metodo = (options.method || "GET").toUpperCase();
+	const headers = {
+		"Content-Type": "application/json",
+		...cabecalhosDeCsrf(metodo, !!token),
+		...(options.headers || {}),
+	};
 	if (token) {
 		headers["Authorization"] = `Bearer ${token}`;
 	}
 
-	const response = await fetch(`${API_URL}${path}`, { ...options, headers });
+	const response = await fetch(`${API_URL}${path}`, { ...options, headers, credentials: "include" });
 
 	if (response.status === 401) {
 		const mensagem = "Sessão expirada ou inválida. Faça login novamente.";
@@ -47,7 +73,7 @@ async function baixarArquivo(path, nomeArquivo) {
 		headers["Authorization"] = `Bearer ${token}`;
 	}
 
-	const response = await fetch(`${API_URL}${path}`, { headers });
+	const response = await fetch(`${API_URL}${path}`, { headers, credentials: "include" });
 
 	if (response.status === 401) {
 		const mensagem = "Sessão expirada ou inválida. Faça login novamente.";

@@ -22,9 +22,14 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 class SecurityConfig {
 
 	@Bean
-	SecurityFilterChain filterChain(HttpSecurity http, SessaoAuthenticationFilter sessaoAuthenticationFilter)
-			throws Exception {
-		http.csrf(csrf -> csrf.disable())
+	SecurityFilterChain filterChain(HttpSecurity http, SessaoAuthenticationFilter sessaoAuthenticationFilter,
+			CsrfProtectionFilter csrfProtectionFilter) throws Exception {
+		http
+				// CSRF do Spring Security continua desligado — a partir da Fase 3B a proteção é
+				// feita por um filtro próprio (CsrfProtectionFilter, abaixo), só quando a
+				// requisição depende do cookie de sessão (o header Authorization já é imune por
+				// natureza). Ver a classe pra mais detalhes.
+				.csrf(csrf -> csrf.disable())
 				.cors(cors -> cors.configurationSource(corsConfigurationSource()))
 				.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 				.authorizeHttpRequests(auth -> auth
@@ -49,7 +54,8 @@ class SecurityConfig {
 								HttpServletResponse.SC_UNAUTHORIZED, "Sessão expirada ou inválida. Faça login novamente."))
 						.accessDeniedHandler((request, response, accessDeniedException) -> escreverErro(response,
 								HttpServletResponse.SC_FORBIDDEN, "Seu perfil não tem permissão para esta ação.")))
-				.addFilterBefore(sessaoAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+				.addFilterBefore(csrfProtectionFilter, UsernamePasswordAuthenticationFilter.class)
+				.addFilterBefore(sessaoAuthenticationFilter, CsrfProtectionFilter.class);
 		return http.build();
 	}
 
@@ -66,7 +72,11 @@ class SecurityConfig {
 		CorsConfiguration configuracao = new CorsConfiguration();
 		configuracao.setAllowedOrigins(List.of("http://localhost:5173"));
 		configuracao.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-		configuracao.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+		configuracao.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-XSRF-TOKEN"));
+		// Fase 3B: precisa pra cookies (sessão/CSRF) trafegarem em requisição cross-origin —
+		// só importa pra quem roda em dev sem o reverse-proxy; em produção (mesma origem,
+		// atrás do proxy) o navegador já manda cookie independente disso.
+		configuracao.setAllowCredentials(true);
 
 		UrlBasedCorsConfigurationSource fonte = new UrlBasedCorsConfigurationSource();
 		fonte.registerCorsConfiguration("/**", configuracao);
