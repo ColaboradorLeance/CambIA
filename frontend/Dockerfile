@@ -3,7 +3,15 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 COPY . .
-ARG VITE_API_URL=http://localhost:8080
+# Bug encontrado ao vivo: o default aqui ficava "http://localhost:8080" (valor de dev de
+# antes do reverse-proxy existir, Fase 3A) — o docker-compose.yml já passa
+# VITE_API_URL="" corretamente, mas uma camada de cache antiga do Docker (de antes da
+# Fase 3A) ficou presa e continuou sendo reaproveitada em builds seguintes, mesmo com
+# `docker compose up -d --build`, porque o valor "vazio" nunca tinha sido de fato
+# construído antes (só `--no-cache` forçou a reconstrução com o valor certo). O default
+# muda pra vazio aqui também — mesmo valor que o compose já pretende passar — pra reduzir
+# o estrago de um cache preso similar no futuro (cairia no valor certo, não no antigo).
+ARG VITE_API_URL=
 ENV VITE_API_URL=$VITE_API_URL
 RUN npm run build
 
