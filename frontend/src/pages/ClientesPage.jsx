@@ -5,6 +5,20 @@ import EmptyState from "../components/EmptyState";
 
 const FORM_VAZIO = { nome: "", documento: "" };
 
+// Preenchimento automático do Nome a partir do CNPJ (14 dígitos) — CPF (11 dígitos)
+// não tem fonte pública de consulta, então não faz nada nesse caso.
+async function buscarNomePorCnpj(documento) {
+	const somenteDigitos = (documento || "").replace(/\D/g, "");
+	if (somenteDigitos.length !== 14) return null;
+	try {
+		const resposta = await api.get(`/clientes/consulta-cnpj/${somenteDigitos}`);
+		return resposta.nome || null;
+	} catch {
+		// Falha na consulta não deve atrapalhar o preenchimento manual — sem pop-up aqui.
+		return null;
+	}
+}
+
 export default function ClientesPage() {
 	const [clientes, setClientes] = useState([]);
 	const [form, setForm] = useState(FORM_VAZIO);
@@ -61,6 +75,13 @@ export default function ClientesPage() {
 		}
 	}
 
+	async function completarNomePeloDocumento() {
+		const nomeEncontrado = await buscarNomePorCnpj(form.documento);
+		if (nomeEncontrado) {
+			setForm((atual) => ({ ...atual, nome: nomeEncontrado }));
+		}
+	}
+
 	return (
 		<div>
 			<h1>Clientes</h1>
@@ -76,6 +97,7 @@ export default function ClientesPage() {
 					placeholder="Documento (CPF/CNPJ)"
 					value={form.documento}
 					onChange={(e) => setForm({ ...form, documento: e.target.value })}
+					onBlur={completarNomePeloDocumento}
 					required
 				/>
 				<button type="submit" className="btn btn-primary">

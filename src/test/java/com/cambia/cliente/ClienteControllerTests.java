@@ -1,5 +1,7 @@
 package com.cambia.cliente;
 
+import java.util.Optional;
+
 import com.cambia.TestcontainersConfiguration;
 import com.cambia.auth.MagicLinkTokenRepository;
 import com.cambia.auth.TestAuthSupport;
@@ -12,9 +14,13 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -32,6 +38,11 @@ class ClienteControllerTests {
 
 	@Autowired
 	private MagicLinkTokenRepository magicLinkTokenRepository;
+
+	// Substitui o cliente real (que chamaria a BrasilAPI de verdade pela internet) por
+	// um dublê — os testes não podem depender de rede externa.
+	@MockitoBean
+	private ConsultaCnpjClient consultaCnpjClient;
 
 	private String authHeader;
 
@@ -143,6 +154,33 @@ class ClienteControllerTests {
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(semDocumento))
 				.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void consultaCnpjRetornaONomeEncontrado() throws Exception {
+		when(consultaCnpjClient.buscarNome("14777639000192")).thenReturn(Optional.of("CRAS Agroindustria LTDA"));
+
+		mockMvc.perform(get("/clientes/consulta-cnpj/14777639000192").header("Authorization", authHeader))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.nome").value("CRAS Agroindustria LTDA"));
+	}
+
+	@Test
+	void consultaCnpjRetornaNomeNuloQuandoNaoEncontrado() throws Exception {
+		when(consultaCnpjClient.buscarNome(eq("14777639000192"))).thenReturn(Optional.empty());
+
+		mockMvc.perform(get("/clientes/consulta-cnpj/14777639000192").header("Authorization", authHeader))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.nome").value(org.hamcrest.Matchers.nullValue()));
+	}
+
+	@Test
+	void consultaCnpjNaoChamaAFonteDeDadosQuandoNaoTem14Digitos() throws Exception {
+		mockMvc.perform(get("/clientes/consulta-cnpj/123.456.789-00").header("Authorization", authHeader))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.nome").value(org.hamcrest.Matchers.nullValue()));
+
+		verifyNoInteractions(consultaCnpjClient);
 	}
 
 }

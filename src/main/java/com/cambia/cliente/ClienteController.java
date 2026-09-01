@@ -20,9 +20,11 @@ import org.springframework.web.bind.annotation.RestController;
 class ClienteController {
 
 	private final ClienteService service;
+	private final ConsultaCnpjClient consultaCnpjClient;
 
-	ClienteController(ClienteService service) {
+	ClienteController(ClienteService service, ConsultaCnpjClient consultaCnpjClient) {
 		this.service = service;
+		this.consultaCnpjClient = consultaCnpjClient;
 	}
 
 	@PostMapping
@@ -40,6 +42,19 @@ class ClienteController {
 	@GetMapping
 	List<ClienteResponse> listar() {
 		return service.listar().stream().map(ClienteResponse::from).toList();
+	}
+
+	// Preenchimento automático do Nome a partir do CNPJ no formulário de cadastro
+	// (Incremento 42) — só CNPJ (14 dígitos), nunca CPF. Sempre responde 200, mesmo
+	// sem achar nada: é um preenchimento de conveniência, nunca deve travar o cadastro
+	// manual. Ver ConsultaCnpjClient.
+	@GetMapping("/consulta-cnpj/{cnpj}")
+	ConsultaCnpjResponse consultarCnpj(@PathVariable String cnpj) {
+		String somenteDigitos = cnpj.replaceAll("\\D", "");
+		if (somenteDigitos.length() != 14) {
+			return new ConsultaCnpjResponse(null);
+		}
+		return new ConsultaCnpjResponse(consultaCnpjClient.buscarNome(somenteDigitos).orElse(null));
 	}
 
 	@PutMapping("/{id}")
