@@ -75,9 +75,13 @@ services:
       CERT_CN: ${CERT_CN:-localhost}
     volumes:
       - reverse_proxy_certs:/etc/nginx/certs
+    # Achado de revisão de segurança: o nginx deste container passou a ouvir em portas
+    # altas (8080/8443) pra poder rodar sem privilégio de root (ver reverse-proxy/Dockerfile
+    # e nginx.conf) — o mapeamento pras portas padrão do host (80/443) continua o mesmo,
+    # então não muda nada pra quem acessa de fora.
     ports:
-      - "443:443"
-      - "80:80"
+      - "443:8443"
+      - "80:8080"
     depends_on:
       - backend
       - frontend
