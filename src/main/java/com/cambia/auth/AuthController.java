@@ -69,7 +69,7 @@ class AuthController {
 	@GetMapping("/verify")
 	LoginResponse verificar(@RequestParam String token, HttpServletRequest requisicao,
 			HttpServletResponse resposta) {
-		if (!limitador.permitir("verify:" + requisicao.getRemoteAddr())) {
+		if (!limitador.permitir("verify:" + ResolvedorDeIpReal.resolver(requisicao))) {
 			throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, MENSAGEM_LIMITE_EXCEDIDO);
 		}
 		LoginResponse loginResponse = service.verificar(token);
