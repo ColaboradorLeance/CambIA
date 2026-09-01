@@ -61,7 +61,7 @@ class FechamentoControllerTests {
 		String tlxBody = mockMvc.perform(post("/bancos")
 						.header("Authorization", authHeader)
 						.contentType(MediaType.APPLICATION_JSON)
-						.content("{\"codigoBanco\":\"TLX\",\"sigla\":\"TLX\",\"nome\":\"TLX\",\"taxaRebate\":0,\"calculoId\":%d}"
+						.content("{\"codigoBanco\":\"999\",\"sigla\":\"TLX\",\"nome\":\"TLX\",\"taxaRebate\":0,\"calculoId\":%d}"
 								.formatted(calculoTlxId)))
 				.andReturn().getResponse().getContentAsString();
 		tlxId = ((Number) JsonPath.read(tlxBody, "$.id")).longValue();
@@ -76,7 +76,7 @@ class FechamentoControllerTests {
 		String bzaBody = mockMvc.perform(post("/bancos")
 						.header("Authorization", authHeader)
 						.contentType(MediaType.APPLICATION_JSON)
-						.content("{\"codigoBanco\":\"BZA\",\"sigla\":\"BZA\",\"nome\":\"BZA\",\"taxaRebate\":0,\"calculoId\":%d}"
+						.content("{\"codigoBanco\":\"998\",\"sigla\":\"BZA\",\"nome\":\"BZA\",\"taxaRebate\":0,\"calculoId\":%d}"
 								.formatted(calculoBzaId)))
 				.andReturn().getResponse().getContentAsString();
 		bzaId = ((Number) JsonPath.read(bzaBody, "$.id")).longValue();

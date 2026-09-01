@@ -124,7 +124,7 @@ class TratamentoErroGlobalTests {
 		Long calculoId = criarERetornarId(authHeader, "/calculos", "{\"nome\":\"C1\",\"formula\":\"N*50%\"}");
 		Long bancoId = criarERetornarId(authHeader, "/bancos",
 				"""
-				{"codigoBanco":"B1","sigla":"B1","nome":"B1","taxaRebate":0,"calculoId":%d}
+				{"codigoBanco":"1","sigla":"B1","nome":"B1","taxaRebate":0,"calculoId":%d}
 				""".formatted(calculoId));
 		mockMvc.perform(post("/operacoes")
 						.header("Authorization", authHeader)

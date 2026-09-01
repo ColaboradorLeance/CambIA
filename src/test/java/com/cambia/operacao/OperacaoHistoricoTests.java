@@ -69,7 +69,7 @@ class OperacaoHistoricoTests {
 						.header("Authorization", authHeader)
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("{\"codigoBanco\":\"%s\",\"sigla\":\"%s\",\"nome\":\"%s\",\"taxaRebate\":0,\"calculoId\":%d}"
-								.formatted(nome, nome, nome, calculoId)))
+								.formatted("999", nome, nome, calculoId)))
 				.andReturn().getResponse().getContentAsString();
 		return ((Number) JsonPath.read(body, "$.id")).longValue();
 	}

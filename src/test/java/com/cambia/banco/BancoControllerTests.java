@@ -153,6 +153,15 @@ class BancoControllerTests {
 	}
 
 	@Test
+	void rejeitaCodigoBancoComLetras() throws Exception {
+		mockMvc.perform(post("/bancos")
+						.header("Authorization", authHeader)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(bancoJson("TLX", "BZA", "Banco BZA", "1.5", calculoId)))
+				.andExpect(status().isBadRequest());
+	}
+
+	@Test
 	void rejeitaCadastroSemCalculo() throws Exception {
 		String semCalculo = """
 				{"codigoBanco":"001","sigla":"BZA","nome":"Banco BZA","taxaRebate":1.5}

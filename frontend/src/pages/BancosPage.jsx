@@ -102,10 +102,12 @@ export default function BancosPage() {
 	// Toda edição no Código do banco (inclusive apagar) já limpa o Nome na hora —
 	// garante que o Nome nunca fica associado a um código diferente do que está
 	// digitado no momento. Só volta a ter um Nome depois de uma busca nova encontrar algo.
+	// Só aceita números — qualquer outro caractere digitado é descartado na hora.
 	function editarCodigoBanco(valor) {
+		const somenteDigitos = valor.replace(/\D/g, "");
 		clearTimeout(debounceRef.current);
 		codigoEmBuscaRef.current = null; // invalida qualquer busca em andamento pro código anterior
-		setForm((atual) => ({ ...atual, codigoBanco: valor, nome: "" }));
+		setForm((atual) => ({ ...atual, codigoBanco: somenteDigitos, nome: "" }));
 		setStatusCodigoBanco(null);
 	}
 
@@ -172,6 +174,7 @@ export default function BancosPage() {
 					value={form.codigoBanco}
 					onChange={(e) => editarCodigoBanco(e.target.value)}
 					onBlur={saiuDoCampoCodigoBanco}
+					inputMode="numeric"
 					required
 				/>
 				{statusCodigoBanco && (

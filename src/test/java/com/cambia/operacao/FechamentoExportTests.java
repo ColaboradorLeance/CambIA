@@ -66,7 +66,7 @@ class FechamentoExportTests {
 		String bancoBody = mockMvc.perform(post("/bancos")
 						.header("Authorization", authHeader)
 						.contentType(MediaType.APPLICATION_JSON)
-						.content("{\"codigoBanco\":\"TLX\",\"sigla\":\"TLX\",\"nome\":\"TLX\",\"taxaRebate\":0,\"calculoId\":%d}"
+						.content("{\"codigoBanco\":\"999\",\"sigla\":\"TLX\",\"nome\":\"TLX\",\"taxaRebate\":0,\"calculoId\":%d}"
 								.formatted(calculoId)))
 				.andReturn().getResponse().getContentAsString();
 		Long bancoId = ((Number) JsonPath.read(bancoBody, "$.id")).longValue();
