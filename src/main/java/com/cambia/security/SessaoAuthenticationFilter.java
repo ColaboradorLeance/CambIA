@@ -40,7 +40,7 @@ class SessaoAuthenticationFilter extends OncePerRequestFilter {
 	@Override
 	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
 			throws ServletException, IOException {
-		String token = extrairTokenDoHeader(request);
+		String token = AutorizacaoHeader.extrairToken(request);
 		if (token == null) {
 			token = extrairTokenDoCookie(request);
 		}
@@ -48,11 +48,6 @@ class SessaoAuthenticationFilter extends OncePerRequestFilter {
 			autenticar(token);
 		}
 		chain.doFilter(request, response);
-	}
-
-	private String extrairTokenDoHeader(HttpServletRequest request) {
-		String header = request.getHeader("Authorization");
-		return header != null && header.startsWith("Bearer ") ? header.substring("Bearer ".length()) : null;
 	}
 
 	private String extrairTokenDoCookie(HttpServletRequest request) {

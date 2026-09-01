@@ -160,6 +160,45 @@ class CookieSessionTests {
 				.andExpect(status().isCreated());
 	}
 
+	// Achado de revisão de segurança ("olhar de hacker ético" — não explorável hoje, mas
+	// frágil): CsrfProtectionFilter isentava CSRF só por existir QUALQUER valor no header
+	// Authorization, mesmo sem o prefixo "Bearer " — nesse caso, SessaoAuthenticationFilter
+	// nunca autentica de fato por esse header (só cai pro cookie de sessão), então CSRF
+	// era pulado justamente na hora em que a credencial em jogo era o cookie, a peça que
+	// ele existe pra proteger. Corrigido com AutorizacaoHeader, compartilhado pelos dois
+	// filtros.
+	@Test
+	void requisicaoComHeaderAuthorizationMalFormadoAindaExigeCsrfMesmoTendoCookieDeSessao() throws Exception {
+		MockHttpServletResponse loginResp = logar("csrf-header-mal-formado@cambia.com.br");
+		Cookie cookieSessao = loginResp.getCookie(NomesCookieAuth.SESSAO);
+
+		mockMvc.perform(post("/clientes")
+						.cookie(cookieSessao)
+						.header("Authorization", "qualquer-coisa-sem-o-prefixo-bearer")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{\"nome\":\"Cliente CSRF\",\"documento\":\"11.111.111/0001-11\"}"))
+				.andExpect(status().isForbidden());
+	}
+
+	// Garante que a correção acima não "super-corrigiu": um header Authorization Bearer
+	// de verdade continua isentando CSRF mesmo quando a requisição também carrega (por
+	// acidente ou não) um cookie de sessão — SessaoAuthenticationFilter usa o header nesse
+	// caso, nunca o cookie, então não há credencial ambiente sendo explorada.
+	@Test
+	void requisicaoComHeaderAuthorizationBearerValidoContinuaImuneAoCsrfMesmoComCookieDeSessaoPresente()
+			throws Exception {
+		MockHttpServletResponse loginResp = logar("csrf-header-e-cookie@cambia.com.br");
+		Cookie cookieSessao = loginResp.getCookie(NomesCookieAuth.SESSAO);
+		String sessionToken = com.jayway.jsonpath.JsonPath.read(loginResp.getContentAsString(), "$.sessionToken");
+
+		mockMvc.perform(post("/clientes")
+						.cookie(cookieSessao)
+						.header("Authorization", "Bearer " + sessionToken)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{\"nome\":\"Cliente CSRF\",\"documento\":\"22.222.222/0001-22\"}"))
+				.andExpect(status().isCreated());
+	}
+
 	@Test
 	void requisicaoComHeaderAuthorizationNaoPrecisaDeCsrf() throws Exception {
 		// O esquema original (header Bearer, sem cookie) continua imune ao CSRF por

@@ -23,13 +23,22 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * consegue ler o cookie desta origem, então não consegue montar esse header sozinho.
  *
  * <p>Só exige isso quando a requisição realmente depende do cookie de sessão pra
- * autenticar: se já veio um header {@code Authorization} (esquema de dev local, sem o
- * reverse-proxy HTTPS), o CSRF não se aplica — um site de terceiros não tem como
- * conhecer/forjar esse header, esse fluxo já é imune por natureza. E se não existe cookie
- * de sessão nenhum na requisição (endpoints de pré-login, como {@code /auth/magic-link} e
- * {@code /auth/bootstrap-admin} — ninguém autenticou ainda, não há credencial ambiente
- * nenhuma sendo explorada), também não se aplica. Isso também significa que nenhum teste
- * automatizado existente (todos usam o header) precisou mudar por causa disto.
+ * autenticar: se já veio um header {@code Authorization: Bearer ...} (esquema de dev
+ * local, sem o reverse-proxy HTTPS), o CSRF não se aplica — um site de terceiros não tem
+ * como conhecer/forjar esse header, esse fluxo já é imune por natureza. E se não existe
+ * cookie de sessão nenhum na requisição (endpoints de pré-login, como
+ * {@code /auth/magic-link} e {@code /auth/bootstrap-admin} — ninguém autenticou ainda, não
+ * há credencial ambiente nenhuma sendo explorada), também não se aplica. Isso também
+ * significa que nenhum teste automatizado existente (todos usam o header) precisou mudar
+ * por causa disto.
+ *
+ * <p>Achado de revisão de segurança ("olhar de hacker ético" — não explorável hoje, mas
+ * frágil): a checagem do header precisa usar exatamente o mesmo critério que
+ * {@link SessaoAuthenticationFilter} usa pra decidir se autentica por ele — ver
+ * {@link AutorizacaoHeader}. Checar só "existe o header" (sem exigir o prefixo
+ * {@code "Bearer "}) isentava CSRF mesmo quando esse header não seria de fato usado pra
+ * autenticar, deixando a decisão real de autenticação cair pro cookie de sessão sem o
+ * CSRF correspondente ter sido exigido.
  */
 @Component
 class CsrfProtectionFilter extends OncePerRequestFilter {
@@ -50,7 +59,7 @@ class CsrfProtectionFilter extends OncePerRequestFilter {
 	}
 
 	private boolean precisaValidarCsrf(HttpServletRequest request) {
-		if (METODOS_SEGUROS.contains(request.getMethod()) || request.getHeader("Authorization") != null) {
+		if (METODOS_SEGUROS.contains(request.getMethod()) || AutorizacaoHeader.extrairToken(request) != null) {
 			return false;
 		}
 		// Só passa daqui se depende de fato do cookie de sessão pra autenticar — sem esse
