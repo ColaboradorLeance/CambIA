@@ -10,6 +10,9 @@ const FILTROS_VAZIOS = {
 	valorMoeda: "",
 	cnpj: "",
 	nome: "",
+	idTrade: "",
+	cv: "",
+	tipo: "",
 };
 
 function formatarMoeda(valor) {
@@ -80,6 +83,9 @@ export default function ListagemOrdensPage() {
 		if (filtros.valorMoeda && !formatarMoeda(op.valorMe).includes(filtros.valorMoeda)) return false;
 		if (!contemTexto(op.clienteDocumento, filtros.cnpj)) return false;
 		if (!contemTexto(op.clienteNome, filtros.nome)) return false;
+		if (!contemTexto(op.idTrade, filtros.idTrade)) return false;
+		if (!contemTexto(op.cv, filtros.cv)) return false;
+		if (!contemTexto(op.prCrVir, filtros.tipo)) return false;
 		return true;
 	});
 
@@ -128,6 +134,30 @@ export default function ListagemOrdensPage() {
 					<input
 						value={filtros.nome}
 						onChange={(e) => atualizarFiltro("nome", e.target.value)}
+						placeholder="Todos"
+					/>
+				</label>
+				<label>
+					ID do trade
+					<input
+						value={filtros.idTrade}
+						onChange={(e) => atualizarFiltro("idTrade", e.target.value)}
+						placeholder="Todos"
+					/>
+				</label>
+				<label>
+					C/V
+					<input
+						value={filtros.cv}
+						onChange={(e) => atualizarFiltro("cv", e.target.value)}
+						placeholder="Todos"
+					/>
+				</label>
+				<label>
+					Tipo
+					<input
+						value={filtros.tipo}
+						onChange={(e) => atualizarFiltro("tipo", e.target.value)}
 						placeholder="Todos"
 					/>
 				</label>
