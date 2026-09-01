@@ -16,6 +16,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.UUID;
 
+import com.jayway.jsonpath.JsonPath;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -35,6 +38,9 @@ class AuthControllerTests {
 
 	@Autowired
 	private MagicLinkTokenRepository magicLinkTokenRepository;
+
+	@Autowired
+	private SessaoRepository sessaoRepository;
 
 	private Usuario criarUsuario(String email) {
 		return usuarioRepository.save(com.cambia.usuario.UsuarioTestFactory.novo("Ana Silva", email, Perfil.ANALISTA));
@@ -101,6 +107,45 @@ class AuthControllerTests {
 
 		mockMvc.perform(get("/auth/verify").param("token", token.getToken()))
 				.andExpect(status().isUnauthorized());
+	}
+
+	// Achado de revisão de segurança: logout precisa invalidar a sessão no servidor, não
+	// só limpar o token no navegador — senão um token vazado continua válido até expirar.
+	@Test
+	void logoutInvalidaASessaoNoServidor() throws Exception {
+		Usuario usuario = criarUsuario("dora@cambia.com.br");
+		mockMvc.perform(post("/auth/magic-link")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"email\":\"dora@cambia.com.br\"}"));
+		MagicLinkToken magicLinkToken = magicLinkTokenRepository.findByUsuarioId(usuario.getId()).orElseThrow();
+
+		String resposta = mockMvc.perform(get("/auth/verify").param("token", magicLinkToken.getToken()))
+				.andExpect(status().isOk())
+				.andReturn().getResponse().getContentAsString();
+		String sessionToken = JsonPath.read(resposta, "$.sessionToken");
+
+		org.junit.jupiter.api.Assertions.assertTrue(sessaoRepository.findByToken(sessionToken).isPresent());
+
+		mockMvc.perform(delete("/auth/sessao").header("Authorization", "Bearer " + sessionToken))
+				.andExpect(status().isNoContent());
+
+		org.junit.jupiter.api.Assertions.assertTrue(sessaoRepository.findByToken(sessionToken).isEmpty());
+
+		// o mesmo token não autentica mais depois do logout
+		mockMvc.perform(get("/operacoes").header("Authorization", "Bearer " + sessionToken))
+				.andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	void logoutSemTokenNaoQuebra() throws Exception {
+		mockMvc.perform(delete("/auth/sessao"))
+				.andExpect(status().isNoContent());
+	}
+
+	@Test
+	void logoutComTokenInexistenteAindaAssimRespondeNoContent() throws Exception {
+		mockMvc.perform(delete("/auth/sessao").header("Authorization", "Bearer token-que-nao-existe"))
+				.andExpect(status().isNoContent());
 	}
 
 }

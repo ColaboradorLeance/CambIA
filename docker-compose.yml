@@ -4,7 +4,11 @@ services:
     environment:
       POSTGRES_DB: cambia
       POSTGRES_USER: cambia
-      POSTGRES_PASSWORD: cambia
+      # Achado de revisão de segurança: senha vinha fixa ("cambia") direto no compose.
+      # Continua com esse valor por padrão (não quebra o ambiente de dev de quem já usa),
+      # mas agora é configurável — defina POSTGRES_PASSWORD no .env com uma senha forte
+      # antes de expor a porta 5432 além do localhost. Ver README.md.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cambia}
     volumes:
       - db_data:/var/lib/postgresql/data
     ports:
@@ -20,7 +24,7 @@ services:
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/cambia
       SPRING_DATASOURCE_USERNAME: cambia
-      SPRING_DATASOURCE_PASSWORD: cambia
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-cambia}
       # Envio real do link magico por e-mail (SMTP) - desligado por padrao.
       # Para habilitar de verdade (relay SMTP do Microsoft 365 / Exchange Online no Azure,
       # quando o plano estiver disponivel) ou para testar contra o Mailpit deste compose

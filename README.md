@@ -45,6 +45,8 @@ cp .env.example .env
 
 Edite o `.env` com um editor de texto. **O mais importante para funcionar fora do `localhost` é `VITE_API_URL`** — leia a explicação abaixo antes de seguir. Os demais campos (envio de e-mail) já funcionam com um padrão razoável para começar a testar (link de acesso aparece no log do backend, sem precisar de SMTP configurado).
 
+Além disso, **troque `POSTGRES_PASSWORD`** por uma senha forte antes de rodar num servidor real — o padrão (`cambia`) existe só pra não quebrar quem já está usando em dev, mas a porta `5432` do Postgres fica publicada no host por padrão (ver limitações conhecidas, mais abaixo).
+
 #### `VITE_API_URL` — o endereço que o navegador do usuário usa para falar com o backend
 
 O front-end é um site estático: o endereço da API fica **gravado dentro dos arquivos JavaScript no momento do build** (`docker compose build`), não é lido em tempo de execução. Isso significa:
@@ -183,6 +185,6 @@ docker-compose.yml           Orquestração dos containers para rodar o sistema 
 ## Limitações conhecidas antes de um uso em produção "real"
 
 - **Sem HTTPS/reverse proxy configurado.** O `docker-compose.yml` expõe a API e o front-end diretamente em HTTP. Para acesso de fora da rede local, é necessário colocar um reverse proxy (ex: Nginx ou Caddy na frente) com TLS antes de expor o servidor à internet.
-- **Credenciais do Postgres fixas no `docker-compose.yml`** (`cambia`/`cambia`) — adequado para uma rede interna controlada; troque antes de expor o serviço a uma rede menos confiável.
+- **Senha do Postgres com valor padrão fraco** (`cambia`) — configurável via `POSTGRES_PASSWORD` no `.env` (ver `.env.example`), mas o padrão continua fraco pra não quebrar quem já usa em dev. **Troque antes de expor o serviço além do localhost** — a porta `5432` fica publicada no host por padrão.
 - **Envio real de e-mail (SMTP)** depende de credenciais próprias da empresa (ver seção acima) — sem isso, login exige acesso aos logs do backend para pegar o token manualmente.
 - Sem rotina automatizada de backup do banco — só o comando manual de `pg_dump` citado acima.

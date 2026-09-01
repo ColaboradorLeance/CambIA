@@ -20,7 +20,16 @@ export function AuthProvider({ children }) {
 		setUsuario(dados.usuario);
 	}
 
-	function logout() {
+	// Achado de revisão de segurança: antes só limpava o navegador — a sessão continuava
+	// válida no servidor até expirar (8h) mesmo depois do "logout". Agora avisa o backend
+	// pra invalidar de verdade (DELETE /auth/sessao), antes de limpar o localStorage (a
+	// chamada precisa do token ainda presente pra identificar qual sessão encerrar).
+	async function logout() {
+		try {
+			await api.del("/auth/sessao");
+		} catch {
+			// mesmo se a chamada falhar (ex.: backend fora do ar), ainda limpa localmente
+		}
 		localStorage.removeItem("sessionToken");
 		localStorage.removeItem("usuario");
 		setUsuario(null);

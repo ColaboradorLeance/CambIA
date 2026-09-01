@@ -67,14 +67,14 @@ class TratamentoErroGlobal extends ResponseEntityExceptionHandler {
 	}
 
 	// Último recurso: qualquer exceção que nenhum @ExceptionHandler específico tratou (um
-	// bug de verdade, não um erro de negócio esperado). A stack trace completa ainda vai
-	// pro log do servidor — só a mensagem de alto nível (sem stack trace) vai pro cliente.
+	// bug de verdade, não um erro de negócio esperado). A stack trace completa vai pro log
+	// do servidor — a mensagem original da exceção NUNCA vai pro cliente (pode conter
+	// detalhe interno: caminho de arquivo, host de banco, fragmento de SQL, etc. —
+	// achado de revisão de segurança). Só uma mensagem fixa e genérica é devolvida.
 	@ExceptionHandler(Exception.class)
 	ResponseEntity<Object> tratarErroInesperado(Exception ex, WebRequest request) {
 		log.error("Erro inesperado não tratado especificamente", ex);
-		String detalhe = ex.getMessage() != null
-				? "Erro inesperado no servidor: " + ex.getMessage()
-				: "Erro inesperado no servidor. Tente novamente ou contate o suporte.";
+		String detalhe = "Erro inesperado no servidor. Tente novamente ou contate o suporte.";
 		return comProblemDetail(ex, HttpStatus.INTERNAL_SERVER_ERROR, detalhe, new HttpHeaders(), request);
 	}
 
