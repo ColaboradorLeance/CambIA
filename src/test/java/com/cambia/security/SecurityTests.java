@@ -162,4 +162,23 @@ class SecurityTests {
 		mockMvc.perform(get("/actuator/health")).andExpect(status().isOk());
 	}
 
+	// Bug de configuração encontrado ao vivo (não durante o desenvolvimento): um
+	// navegador de verdade manda o header Origin mesmo numa requisição de MESMA origem
+	// (atrás do reverse-proxy, Fase 3A, front-end e backend são a mesma origem) — sem
+	// essa origem na lista de CORS permitidas (que só tinha a de dev local,
+	// http://localhost:5173), o próprio CorsFilter do Spring rejeitava com 403 antes de
+	// chegar em qualquer controller, quebrando o login pra qualquer usuário de verdade.
+	// O curl usado pra verificar cada correção desta revisão de segurança não reproduzia
+	// isso, por não mandar esse header por padrão — só apareceu quando um usuário testou
+	// num navegador de verdade. MockMvc tem a mesma lacuna do curl: só reproduz mandando
+	// o header explicitamente, como abaixo.
+	@Test
+	void origemDoReverseProxyNaoLevaCorsARejeitarORequisicaoDeLogin() throws Exception {
+		mockMvc.perform(post("/auth/magic-link")
+						.header("Origin", "https://localhost")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{\"email\":\"origem-cors@cambia.com.br\"}"))
+				.andExpect(status().isAccepted());
+	}
+
 }

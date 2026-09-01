@@ -5,6 +5,7 @@ import java.util.List;
 
 import jakarta.servlet.http.HttpServletResponse;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -20,6 +21,20 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @Configuration
 @EnableWebSecurity
 class SecurityConfig {
+
+	// Bug encontrado ao vivo (não uma pendência de segurança, um erro de configuração):
+	// esta lista só tinha a origem de dev local (Vite, sem o reverse-proxy). Atrás do
+	// reverse-proxy (Fase 3A), front-end e backend viram a mesma origem — mas um
+	// navegador de verdade ainda manda o header Origin em requisições POST/PUT/DELETE
+	// mesmo sendo a MESMA origem (o curl usado pra verificar cada correção desta revisão
+	// não manda esse header por padrão, por isso o problema não apareceu até um
+	// navegador real tentar logar). Sem essa origem na lista, o próprio CorsFilter do
+	// Spring rejeitava a requisição com 403 antes dela chegar em qualquer controller —
+	// nem chegava a ser uma questão de CSRF. Valor configurável (deriva do mesmo
+	// CERT_CN usado pro certificado — ver docker-compose.yml) porque a origem real de
+	// produção depende de como o reverse-proxy foi acessado, não é sempre "localhost".
+	@Value("${cambia.cors.origem-adicional:https://localhost}")
+	private String origemCorsAdicional;
 
 	@Bean
 	SecurityFilterChain filterChain(HttpSecurity http, SessaoAuthenticationFilter sessaoAuthenticationFilter,
@@ -70,7 +85,7 @@ class SecurityConfig {
 
 	private CorsConfigurationSource corsConfigurationSource() {
 		CorsConfiguration configuracao = new CorsConfiguration();
-		configuracao.setAllowedOrigins(List.of("http://localhost:5173"));
+		configuracao.setAllowedOrigins(List.of("http://localhost:5173", origemCorsAdicional));
 		configuracao.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
 		configuracao.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-XSRF-TOKEN"));
 		// Fase 3B: precisa pra cookies (sessão/CSRF) trafegarem em requisição cross-origin —

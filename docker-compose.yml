@@ -38,6 +38,13 @@ services:
       SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD:-}
       SPRING_MAIL_SMTP_AUTH: ${SPRING_MAIL_SMTP_AUTH:-true}
       SPRING_MAIL_SMTP_STARTTLS: ${SPRING_MAIL_SMTP_STARTTLS:-true}
+      # Bug de configuração encontrado ao vivo: sem isso, um navegador de verdade (que
+      # manda o header Origin mesmo em requisição de mesma origem) tomava 403 do próprio
+      # CorsFilter do Spring ao tentar logar através do reverse-proxy — o curl usado pra
+      # verificar cada correção desta revisão não reproduzia, por não mandar esse header
+      # por padrão. Deriva do mesmo CERT_CN usado pro certificado (padrão "localhost")
+      # porque é o mesmo host por onde o navegador de fato acessa em produção.
+      CAMBIA_CORS_ORIGEM_ADICIONAL: https://${CERT_CN:-localhost}
     # Achado de revisão de segurança (Fase 3A): não publica mais a porta 8080 direto no
     # host — só o "reverse-proxy" (HTTPS) fica exposto de fora. Continua alcançável
     # normalmente por outros containers da mesma rede (ex: reverse-proxy) pelo nome
