@@ -6,7 +6,8 @@ import EmptyState from "../components/EmptyState";
 import ConfirmModal from "../components/ConfirmModal";
 import CurrencyPicker from "../components/CurrencyPicker";
 import SearchPicker from "../components/SearchPicker";
-import { formatarData } from "../utils/data";
+import { formatarData, formatarDataHora } from "../utils/data";
+import { formatarMoeda, formatarPercentual, formatarSpreadEmissao } from "../utils/formatacao";
 
 // spreadEmissao não tem campo nenhum na tela (pedido do usuário) — sempre "NA" aqui,
 // porque a tela só cria/edita operações com prCrVir "Pronto" (Crédito/Virtual só entram
@@ -32,11 +33,6 @@ const FILTROS_VAZIOS = {
 	cnpj: "",
 	nome: "",
 };
-
-function formatarMoeda(valor) {
-	if (valor === null || valor === undefined) return "—";
-	return Number(valor).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 6 });
-}
 
 function contemTexto(valor, filtro) {
 	if (!filtro) return true;
@@ -352,7 +348,16 @@ export default function OperacoesPage() {
 						<th>Tipo</th>
 						<th>Moeda</th>
 						<th>Valor ME</th>
+						<th>R$</th>
+						<th>Total Bruto</th>
+						<th>Valor Absoluto</th>
+						<th>Spread emissão</th>
+						<th>Spread liquidação</th>
+						<th>Custo</th>
+						<th>Comissão</th>
 						<th>Criado por</th>
+						<th>Completado por</th>
+						<th>Completado em</th>
 						<th></th>
 					</tr>
 				</thead>
@@ -368,7 +373,19 @@ export default function OperacoesPage() {
 							<td>{op.prCrVir}</td>
 							<td>{op.moeda}</td>
 							<td className="mono">{formatarMoeda(op.valorMe)}</td>
+							{/* Campos calculados — ficam vazios ("—") enquanto a ordem está Em andamento;
+							    só existem depois de Confirmada (docs/dominio.md) — mesma coluna, mesmo
+							    formatador da aba Confirmadas, só o valor que ainda não existe. */}
+							<td className="mono">{formatarMoeda(op.reais)}</td>
+							<td className="mono">{formatarMoeda(op.totalBrutoCambio)}</td>
+							<td className="mono">{formatarMoeda(op.valorAbsoluto)}</td>
+							<td className="mono">{formatarSpreadEmissao(op.spreadEmissao)}</td>
+							<td className="mono">{formatarPercentual(op.spreadLiquidacao)}</td>
+							<td className="mono">{formatarPercentual(op.custo)}</td>
+							<td className="mono">{formatarMoeda(op.comissaoLiquida)}</td>
 							<td>{op.criadoPorNome || "—"}</td>
+							<td>{op.completadoPorNome || "—"}</td>
+							<td>{formatarDataHora(op.completadoEm)}</td>
 							<td>
 								{!ehConsultor && (
 									<>
