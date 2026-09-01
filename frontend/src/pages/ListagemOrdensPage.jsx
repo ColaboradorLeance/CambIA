@@ -156,6 +156,7 @@ export default function ListagemOrdensPage() {
 								<th>Total Bruto</th>
 								<th>Valor Absoluto</th>
 								<th>Spread liquidação</th>
+								<th>Custo</th>
 								<th>Comissão</th>
 								<th>Criado por</th>
 								<th>Completado por</th>
@@ -178,6 +179,7 @@ export default function ListagemOrdensPage() {
 									<td className="mono">{formatarMoeda(op.totalBrutoCambio)}</td>
 									<td className="mono">{formatarMoeda(op.valorAbsoluto)}</td>
 									<td className="mono">{formatarPercentual(op.spreadLiquidacao)}</td>
+									<td className="mono">{formatarPercentual(op.custo)}</td>
 									<td className="mono">{formatarMoeda(op.comissaoLiquida)}</td>
 									<td>{op.criadoPorNome || "—"}</td>
 									<td>{op.completadoPorNome || "—"}</td>

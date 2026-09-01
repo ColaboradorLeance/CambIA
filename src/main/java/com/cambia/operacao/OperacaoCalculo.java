@@ -19,23 +19,25 @@ class OperacaoCalculo {
 	// tem escala própria — ver calcularSpreadLiquidacao.
 	private static final int ESCALA_SPREAD = 3;
 
-	static ValoresCalculados calcular(BigDecimal valorMe, BigDecimal nivelamento, BigDecimal taxaFinal, String cv,
-			String formulaComissaoBanco, BigDecimal taxaRebateBanco) {
+	static ValoresCalculados calcular(BigDecimal valorMe, BigDecimal spotAsset, BigDecimal nivelamento,
+			BigDecimal taxaFinal, String cv, String prCrVir, String formulaComissaoBanco,
+			BigDecimal taxaRebateBanco) {
 		BigDecimal reais = valorMe.multiply(taxaFinal).setScale(ESCALA, RoundingMode.HALF_UP);
 		BigDecimal valorAbsoluto = taxaFinal.subtract(nivelamento).abs().multiply(valorMe)
 				.setScale(ESCALA, RoundingMode.HALF_UP);
 		BigDecimal spreadLiquidacao = calcularSpreadLiquidacao(nivelamento, taxaFinal, cv);
+		BigDecimal custo = calcularCusto(spotAsset, taxaFinal, prCrVir);
 
 		BigDecimal totalBrutoCambio = calcularTotalBrutoCambio(valorMe, nivelamento, taxaFinal, cv);
 		if (totalBrutoCambio == null) {
-			return new ValoresCalculados(reais, null, null, valorAbsoluto, spreadLiquidacao);
+			return new ValoresCalculados(reais, null, null, valorAbsoluto, spreadLiquidacao, custo);
 		}
 
 		BigDecimal comissaoLiquida = formulaComissaoBanco == null ? null
 				: new FormulaComissao(formulaComissaoBanco).avaliar(totalBrutoCambio, taxaRebateBanco)
 						.setScale(ESCALA, RoundingMode.HALF_UP);
 
-		return new ValoresCalculados(reais, totalBrutoCambio, comissaoLiquida, valorAbsoluto, spreadLiquidacao);
+		return new ValoresCalculados(reais, totalBrutoCambio, comissaoLiquida, valorAbsoluto, spreadLiquidacao, custo);
 	}
 
 	private static BigDecimal calcularTotalBrutoCambio(BigDecimal valorMe, BigDecimal nivelamento,
@@ -62,6 +64,18 @@ class OperacaoCalculo {
 			return taxaFinal.divide(nivelamento, ESCALA_SPREAD, RoundingMode.HALF_UP).subtract(BigDecimal.ONE);
 		}
 		return null;
+	}
+
+	// Achado de negócio (Incremento 57): fórmula confirmada pelo usuário. Diferente de
+	// Total Bruto/Spread liquidação (ficam null quando não há fórmula pro caso), Custo
+	// usa 0 explicitamente pra qualquer tipo de ordem que não seja "Crédito" (Pronto,
+	// Virtual, ou qualquer outro valor) — pedido assim pelo usuário, não é "sem fórmula".
+	// Usa Spot Asset, campo que até aqui não entrava em nenhuma fórmula confirmada.
+	private static BigDecimal calcularCusto(BigDecimal spotAsset, BigDecimal taxaFinal, String prCrVir) {
+		if ("Credito".equalsIgnoreCase(prCrVir)) {
+			return spotAsset.divide(taxaFinal, ESCALA_SPREAD, RoundingMode.HALF_UP).subtract(BigDecimal.ONE);
+		}
+		return BigDecimal.ZERO.setScale(ESCALA_SPREAD, RoundingMode.HALF_UP);
 	}
 
 }
