@@ -39,6 +39,9 @@ export default function BancosPage() {
 	// chegou atrasada depois que o usuário já editou o campo de novo (evita que uma
 	// busca antiga sobrescreva o Nome com o banco errado).
 	const codigoEmBuscaRef = useRef(null);
+	// Timer do debounce — busca sozinha meio segundo depois que a pessoa para de
+	// digitar, sem precisar sair do campo (ver useEffect abaixo).
+	const debounceRef = useRef(null);
 
 	async function carregar() {
 		setCarregando(true);
@@ -98,14 +101,15 @@ export default function BancosPage() {
 
 	// Toda edição no Código do banco (inclusive apagar) já limpa o Nome na hora —
 	// garante que o Nome nunca fica associado a um código diferente do que está
-	// digitado no momento. Só volta a ter um Nome depois de uma nova busca (blur).
+	// digitado no momento. Só volta a ter um Nome depois de uma busca nova encontrar algo.
 	function editarCodigoBanco(valor) {
+		clearTimeout(debounceRef.current);
 		codigoEmBuscaRef.current = null; // invalida qualquer busca em andamento pro código anterior
 		setForm((atual) => ({ ...atual, codigoBanco: valor, nome: "" }));
 		setStatusCodigoBanco(null);
 	}
 
-	async function completarNomePeloCodigoBanco() {
+	async function buscarAgora() {
 		const somenteDigitos = (form.codigoBanco || "").replace(/\D/g, "");
 		if (somenteDigitos.length !== 3 && somenteDigitos.length !== 8) {
 			codigoEmBuscaRef.current = null;
@@ -122,6 +126,24 @@ export default function BancosPage() {
 			setForm((atual) => ({ ...atual, nome: resultado.nome }));
 		}
 		setStatusCodigoBanco(resultado);
+	}
+
+	// Busca sozinha meio segundo depois que a pessoa para de digitar um código de 3 ou
+	// 8 dígitos — não precisa sair do campo pra disparar a busca. Sair do campo antes
+	// disso (onBlur, abaixo) ainda dispara na hora, sem esperar o meio segundo.
+	useEffect(() => {
+		const somenteDigitos = (form.codigoBanco || "").replace(/\D/g, "");
+		if (somenteDigitos.length !== 3 && somenteDigitos.length !== 8) {
+			return;
+		}
+		debounceRef.current = setTimeout(buscarAgora, 500);
+		return () => clearTimeout(debounceRef.current);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [form.codigoBanco]);
+
+	function saiuDoCampoCodigoBanco() {
+		clearTimeout(debounceRef.current);
+		buscarAgora();
 	}
 
 	async function remover(id) {
@@ -149,7 +171,7 @@ export default function BancosPage() {
 					placeholder="Código do banco (COMPE ou ISPB)"
 					value={form.codigoBanco}
 					onChange={(e) => editarCodigoBanco(e.target.value)}
-					onBlur={completarNomePeloCodigoBanco}
+					onBlur={saiuDoCampoCodigoBanco}
 					required
 				/>
 				{statusCodigoBanco && (
