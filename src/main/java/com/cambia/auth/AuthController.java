@@ -36,6 +36,7 @@ class AuthController {
 
 	private static final String MENSAGEM_LIMITE_EXCEDIDO = "Muitas tentativas. Aguarde alguns minutos antes de tentar de novo.";
 	private static final Duration VALIDADE_COOKIE_SESSAO = Duration.ofHours(8); // mesmo valor de AuthService
+	private static final Duration VALIDADE_COOKIE_VINCULO = Duration.ofMinutes(15); // mesmo valor de AuthService
 
 	private final AuthService service;
 	private final LimitadorDeRequisicoes limitador;
@@ -54,26 +55,44 @@ class AuthController {
 	// Achado de revisão de segurança: sem limite, esse endpoint podia ser usado pra
 	// "bombardear" o e-mail de alguém com links, ou pra tentativas repetidas de
 	// enumeração. Limite por e-mail (não por IP) — é o alvo de verdade sendo protegido.
+	//
+	// Achado de revisão de segurança ("login CSRF" em /auth/verify): grava um cookie de
+	// vínculo (nonce httpOnly) só quando a requisição vem por HTTPS de verdade (atrás do
+	// reverse-proxy — ver usaCookieDeVinculo). Em dev local sem HTTPS, sem cookie, sem
+	// vínculo exigido depois — comportamento igual ao de antes desta correção.
 	@PostMapping("/magic-link")
 	@ResponseStatus(HttpStatus.ACCEPTED)
-	void solicitarLink(@Valid @RequestBody MagicLinkRequest request) {
+	void solicitarLink(@Valid @RequestBody MagicLinkRequest request, HttpServletRequest requisicao,
+			HttpServletResponse resposta) {
 		if (!limitador.permitir("magic-link:" + request.email().toLowerCase())) {
 			throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, MENSAGEM_LIMITE_EXCEDIDO);
 		}
-		service.solicitarLink(request.email());
+		String vinculo = usaCookieDeVinculo(requisicao) ? UUID.randomUUID().toString() : null;
+		service.solicitarLink(request.email(), vinculo);
+		if (vinculo != null) {
+			definirCookieDeVinculo(resposta, vinculo);
+		}
 	}
 
 	// Achado de revisão de segurança: sem limite, nada impedia tentativas repetidas de
 	// adivinhar um token válido. Limite por IP de origem (não por token — o token muda a
 	// cada tentativa, então não serviria de chave).
+	//
+	// Achado de revisão de segurança ("login CSRF"): sem o cookie de vínculo (gravado em
+	// /auth/magic-link, ver acima), um atacante conseguia pedir seu próprio link e induzir
+	// a vítima a completá-lo, autenticando a vítima NA CONTA DO ATACANTE sem perceber.
+	// vinculoDoCookie precisa bater com o gravado junto do token — ver
+	// AuthService.verificar/MagicLinkToken.vinculoCompativel.
 	@GetMapping("/verify")
 	LoginResponse verificar(@RequestParam String token, HttpServletRequest requisicao,
-			HttpServletResponse resposta) {
+			HttpServletResponse resposta,
+			@CookieValue(value = NomesCookieAuth.VINCULO_LOGIN, required = false) String vinculoDoCookie) {
 		if (!limitador.permitir("verify:" + ResolvedorDeIpReal.resolver(requisicao))) {
 			throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, MENSAGEM_LIMITE_EXCEDIDO);
 		}
-		LoginResponse loginResponse = service.verificar(token);
+		LoginResponse loginResponse = service.verificar(token, vinculoDoCookie);
 		definirCookiesDeSessao(resposta, loginResponse.sessionToken());
+		limparCookieDeVinculo(resposta);
 		return loginResponse;
 	}
 
@@ -127,6 +146,38 @@ class AuthController {
 			cookie.setMaxAge(0);
 			resposta.addCookie(cookie);
 		}
+	}
+
+	// Achado de revisão de segurança ("login CSRF"): o cookie de vínculo só faz sentido —
+	// e só é aceito pelo navegador — quando a conexão de verdade (cliente-reverse-proxy) é
+	// HTTPS; marcá-lo Secure incondicionalmente (mesmo padrão dos outros cookies desta
+	// classe) faria o navegador simplesmente descartá-lo em dev local sem HTTPS, e nesse
+	// caso o vínculo NÃO deve ser exigido (senão quebraria o login em dev, que depende só
+	// do header Authorization — ver README). O backend nunca termina TLS ele mesmo (isso é
+	// feito pelo reverse-proxy — Fase 3A), então request.isSecure() sempre vem falso
+	// mesmo em produção; o sinal de verdade é o X-Forwarded-Proto que o próprio
+	// reverse-proxy grava (reverse-proxy/nginx.conf) — confiável porque o backend nunca é
+	// alcançável direto de fora do Docker Compose (portas não publicadas, Fase 3A).
+	private boolean usaCookieDeVinculo(HttpServletRequest requisicao) {
+		return requisicao.isSecure() || "https".equalsIgnoreCase(requisicao.getHeader("X-Forwarded-Proto"));
+	}
+
+	private void definirCookieDeVinculo(HttpServletResponse resposta, String vinculo) {
+		resposta.addHeader(HttpHeaders.SET_COOKIE, ResponseCookie.from(NomesCookieAuth.VINCULO_LOGIN, vinculo)
+				.httpOnly(true)
+				.secure(true)
+				.sameSite("Strict")
+				.path("/auth")
+				.maxAge(VALIDADE_COOKIE_VINCULO)
+				.build()
+				.toString());
+	}
+
+	private void limparCookieDeVinculo(HttpServletResponse resposta) {
+		Cookie cookie = new Cookie(NomesCookieAuth.VINCULO_LOGIN, "");
+		cookie.setPath("/auth");
+		cookie.setMaxAge(0);
+		resposta.addCookie(cookie);
 	}
 
 }

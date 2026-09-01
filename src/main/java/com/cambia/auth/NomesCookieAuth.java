@@ -13,6 +13,15 @@ public final class NomesCookieAuth {
 	/** Não-httpOnly — só serve pro dublê-cookie de proteção CSRF (ver CsrfProtectionFilter). */
 	public static final String CSRF = "XSRF-TOKEN";
 
+	/**
+	 * httpOnly — nonce que amarra um pedido de link mágico ao navegador que pediu,
+	 * fechando o "login CSRF" em {@code /auth/verify}: sem isso, um atacante conseguia
+	 * pedir seu próprio link e induzir a vítima a completá-lo, autenticando a vítima na
+	 * conta do atacante. Só existe entre {@code POST /auth/magic-link} e
+	 * {@code GET /auth/verify} (Path=/auth, expira com o próprio link). Ver AuthController.
+	 */
+	public static final String VINCULO_LOGIN = "cambia_vinculo_login";
+
 	private NomesCookieAuth() {
 	}
 

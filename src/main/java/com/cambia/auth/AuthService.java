@@ -68,19 +68,31 @@ class AuthService {
 	// Achado de revisão de segurança: o envio roda em segundo plano (MagicLinkEnvioAssincrono)
 	// pra não deixar o tempo de resposta variar conforme o e-mail existe ou não — a parte
 	// mais lenta (o SMTP de verdade) deixa de bloquear a resposta HTTP.
-	void solicitarLink(String email) {
+	//
+	// Achado de revisão de segurança ("login CSRF"): vinculo (pode ser null — ver
+	// AuthController.usaCookieDeVinculo) é gravado junto do token pra ser exigido de volta
+	// na hora de verificar, ver MagicLinkToken.vinculoCompativel.
+	void solicitarLink(String email, String vinculo) {
 		usuarioRepository.findByEmail(email).ifPresent(usuario -> {
 			String token = UUID.randomUUID().toString();
 			MagicLinkToken magicLinkToken = new MagicLinkToken(usuario.getId(), token,
-					Instant.now().plus(VALIDADE_MAGIC_LINK));
+					Instant.now().plus(VALIDADE_MAGIC_LINK), vinculo);
 			magicLinkTokenRepository.save(magicLinkToken);
 			envioAssincrono.enviar(email, token);
 		});
 	}
 
-	LoginResponse verificar(String token) {
+	// Achado de revisão de segurança ("login CSRF" em GET /auth/verify): sem isso, um
+	// atacante conseguia pedir seu próprio link mágico e induzir a vítima (clicando num
+	// link ou colando um código repassado por engenharia social) a completá-lo — a vítima
+	// era autenticada NA CONTA DO ATACANTE sem perceber, e qualquer dado que digitasse
+	// depois ficava visível pro atacante ao voltar pra própria conta. vinculoDoCookie
+	// precisa bater com o vinculo gravado junto do token (ver solicitarLink) — só o
+	// navegador que pediu o link consegue completá-lo.
+	LoginResponse verificar(String token, String vinculoDoCookie) {
 		MagicLinkToken magicLinkToken = magicLinkTokenRepository.findByToken(token)
 				.filter(t -> t.isValido(Instant.now()))
+				.filter(t -> t.vinculoCompativel(vinculoDoCookie))
 				.orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Link inválido ou expirado"));
 
 		magicLinkToken.marcarUsado();

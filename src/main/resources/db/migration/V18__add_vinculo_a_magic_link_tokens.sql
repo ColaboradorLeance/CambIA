@@ -1,0 +1,11 @@
+-- Achado de revisão de segurança: "login CSRF" em GET /auth/verify — um atacante podia
+-- solicitar seu próprio link mágico, pegar o token e induzir a vítima a completá-lo
+-- (clicando num link ou colando um código passado por engenharia social), autenticando a
+-- vítima na CONTA DO ATACANTE sem ela perceber. Correção: o token mágico passa a poder
+-- carregar um "vínculo" (nonce aleatório) gravado também num cookie httpOnly na resposta
+-- de /auth/magic-link; /auth/verify só aceita o token se o mesmo vínculo vier de volta no
+-- cookie — ou seja, só o mesmo navegador que pediu o link consegue completá-lo. Coluna
+-- nula por padrão: só é exigida quando a requisição de fato passa pelo reverse-proxy HTTPS
+-- (onde o cookie funciona); em dev local sem HTTPS continua nula, sem vínculo exigido,
+-- exatamente como antes desta correção.
+ALTER TABLE magic_link_tokens ADD COLUMN vinculo VARCHAR(64);
