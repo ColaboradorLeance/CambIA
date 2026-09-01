@@ -35,10 +35,21 @@ const ADMIN_E_ANALISTA = ["ADMIN", "ANALISTA"];
 
 // Telas antes separadas no menu, agora agrupadas como abas dentro de uma página só
 // (Incremento 31) — reduz o número de itens do menu lateral sem remover nenhuma tela.
+//
+// Achado ao vivo (Incremento 60): as rotas do front-end aqui usavam "/operacoes" — o
+// MESMO prefixo da API do backend (/operacoes, /operacoes/{id}, /operacoes/historico).
+// Funcionava normalmente navegando por dentro da SPA (o React Router nunca faz uma
+// requisição de verdade), mas quebrava ao RECARREGAR a página: o navegador manda uma
+// requisição HTTP de verdade pra esse caminho, o reverse-proxy vê o prefixo "operacoes" e
+// manda pro backend em vez de servir a SPA — daí um "id: listagem inválido, esperado
+// Long" ao recarregar em /operacoes/listagem (o backend tentava tratar "listagem" como
+// {id}). Renomeado pra "/ordens" (mesma palavra já usada no rótulo do menu, "Ordens") —
+// mesmo padrão já usado em /cadastros/* (evita colidir com /clientes, /bancos, etc.) e em
+// /fechamento singular (evita colidir com /fechamentos plural da API).
 const ABAS_ORDENS = [
-	{ to: "/operacoes", label: "Em andamento", exact: true },
-	{ to: "/operacoes/listagem", label: "Confirmadas" },
-	{ to: "/operacoes/historico", label: "Histórico" },
+	{ to: "/ordens", label: "Em andamento", exact: true },
+	{ to: "/ordens/listagem", label: "Confirmadas" },
+	{ to: "/ordens/historico", label: "Histórico" },
 ];
 
 const ABAS_FECHAMENTO = [
@@ -46,11 +57,21 @@ const ABAS_FECHAMENTO = [
 	{ to: "/fechamento/historico", label: "Histórico" },
 ];
 
+// Achado ao vivo (Incremento 60): mesmo problema do ABAS_ORDENS acima, mas com uma
+// pegadinha — o regex do reverse-proxy (reverse-proxy/nginx.conf) captura pelo SEGMENTO
+// DE TOPO do caminho ("relatorios"), não pelo caminho inteiro. Só trocar o sub-caminho
+// (ex.: /relatorios/comparativo -> /relatorios/comparativos) não resolve nada, porque
+// QUALQUER coisa debaixo de "/relatorios/" continua caindo no backend. A correção de
+// verdade é no segmento de topo: "/relatorios" (plural, igual ao prefixo do
+// RelatorioController) vira "/relatorio" (singular) — mesmo truque já usado em
+// /fechamento (singular) pra não colidir com /fechamentos (plural) da API. Sub-caminhos
+// (comparativo, rankings, posicao-aberto) voltam a ser iguais ao rótulo, sem precisar de
+// nenhum truque adicional.
 const ABAS_RELATORIOS = [
-	{ to: "/relatorios/operacoes", label: "Ordens" },
-	{ to: "/relatorios/comparativo", label: "Comparativos" },
-	{ to: "/relatorios/rankings", label: "Rankings" },
-	{ to: "/relatorios/posicao-aberto", label: "Posição em aberto" },
+	{ to: "/relatorio/ordens", label: "Ordens" },
+	{ to: "/relatorio/comparativo", label: "Comparativos" },
+	{ to: "/relatorio/rankings", label: "Rankings" },
+	{ to: "/relatorio/posicao-aberto", label: "Posição em aberto" },
 ];
 
 const ABAS_CADASTROS = [
@@ -65,14 +86,14 @@ const NAV_GROUPS = [
 		titulo: "Operacional",
 		itens: [
 			{ to: "/", label: "Painel", icon: IconGrid, exact: true, roles: ADMIN_E_ANALISTA },
-			{ to: "/operacoes", label: "Ordens", icon: IconList },
+			{ to: "/ordens", label: "Ordens", icon: IconList },
 			{ to: "/fechamento", label: "Fechamento", icon: IconCalendarCheck, roles: ADMIN_E_ANALISTA },
 		],
 	},
 	{
 		titulo: "Relatórios",
 		roles: ADMIN_E_ANALISTA,
-		itens: [{ to: "/relatorios", label: "Relatórios", icon: IconTrend }],
+		itens: [{ to: "/relatorio", label: "Relatórios", icon: IconTrend }],
 	},
 	{
 		titulo: "Cadastros",
@@ -167,7 +188,7 @@ export default function App() {
 				}
 			/>
 			<Route
-				path="/operacoes"
+				path="/ordens"
 				element={
 					<Pagina>
 						<SubNav itens={ABAS_ORDENS} />
@@ -176,7 +197,7 @@ export default function App() {
 				}
 			/>
 			<Route
-				path="/operacoes/listagem"
+				path="/ordens/listagem"
 				element={
 					<Pagina>
 						<SubNav itens={ABAS_ORDENS} />
@@ -185,7 +206,7 @@ export default function App() {
 				}
 			/>
 			<Route
-				path="/operacoes/historico"
+				path="/ordens/historico"
 				element={
 					<Pagina>
 						<SubNav itens={ABAS_ORDENS} />
@@ -211,9 +232,9 @@ export default function App() {
 					</Pagina>
 				}
 			/>
-			<Route path="/relatorios" element={<Navigate to="/relatorios/operacoes" replace />} />
+			<Route path="/relatorio" element={<Navigate to="/relatorio/ordens" replace />} />
 			<Route
-				path="/relatorios/operacoes"
+				path="/relatorio/ordens"
 				element={
 					<Pagina roles={ADMIN_E_ANALISTA}>
 						<SubNav itens={ABAS_RELATORIOS} />
@@ -222,7 +243,7 @@ export default function App() {
 				}
 			/>
 			<Route
-				path="/relatorios/comparativo"
+				path="/relatorio/comparativo"
 				element={
 					<Pagina roles={ADMIN_E_ANALISTA}>
 						<SubNav itens={ABAS_RELATORIOS} />
@@ -231,7 +252,7 @@ export default function App() {
 				}
 			/>
 			<Route
-				path="/relatorios/rankings"
+				path="/relatorio/rankings"
 				element={
 					<Pagina roles={ADMIN_E_ANALISTA}>
 						<SubNav itens={ABAS_RELATORIOS} />
@@ -240,7 +261,7 @@ export default function App() {
 				}
 			/>
 			<Route
-				path="/relatorios/posicao-aberto"
+				path="/relatorio/posicao-aberto"
 				element={
 					<Pagina roles={ADMIN_E_ANALISTA}>
 						<SubNav itens={ABAS_RELATORIOS} />

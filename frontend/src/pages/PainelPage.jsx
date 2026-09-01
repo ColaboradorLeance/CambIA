@@ -102,7 +102,7 @@ export default function PainelPage() {
 					<h1>Olá, {usuario?.nome}</h1>
 					<p>{dataDeHoje()} · resumo de hoje</p>
 				</div>
-				<Link to="/operacoes" className="btn btn-primary">
+				<Link to="/ordens" className="btn btn-primary">
 					<IconPlus size={15} strokeWidth="2.4" />
 					Nova ordem
 				</Link>
@@ -171,7 +171,7 @@ export default function PainelPage() {
 				<div className="card">
 					<h3>Ações rápidas</h3>
 					<div className="quick-actions">
-						<Link to="/operacoes" className="quick-action-link">
+						<Link to="/ordens" className="quick-action-link">
 							<IconPlus size={15} strokeWidth="2.2" />
 							Registrar ordem
 						</Link>
@@ -179,7 +179,7 @@ export default function PainelPage() {
 							<IconCalendarCheck size={15} strokeWidth="2.2" />
 							Ver fechamento de hoje
 						</Link>
-						<Link to="/relatorios/operacoes" className="quick-action-link">
+						<Link to="/relatorio/ordens" className="quick-action-link">
 							<IconTrend size={15} strokeWidth="2.2" />
 							Abrir relatórios
 						</Link>
@@ -189,7 +189,7 @@ export default function PainelPage() {
 				<div className="card">
 					<div className="card-head">
 						<h3 style={{ margin: 0 }}>Últimas ordens</h3>
-						<Link to="/operacoes" style={{ fontSize: "12.5px", fontWeight: 600 }}>
+						<Link to="/ordens" style={{ fontSize: "12.5px", fontWeight: 600 }}>
 							Ver todas
 						</Link>
 					</div>
