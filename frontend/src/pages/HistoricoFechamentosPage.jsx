@@ -12,6 +12,7 @@ export default function HistoricoFechamentosPage() {
 	const [historico, setHistorico] = useState([]);
 	const [usuarios, setUsuarios] = useState([]);
 	const [destinatariosIds, setDestinatariosIds] = useState(new Set());
+	const [buscaDestinatario, setBuscaDestinatario] = useState("");
 	const [mensagem, setMensagem] = useState("");
 	const [mensagemDestinatarios, setMensagemDestinatarios] = useState("");
 	const [carregando, setCarregando] = useState(true);
@@ -61,6 +62,26 @@ export default function HistoricoFechamentosPage() {
 				novo.delete(usuarioId);
 			} else {
 				novo.add(usuarioId);
+			}
+			return novo;
+		});
+	}
+
+	// "Selecionar todos" age só sobre a lista FILTRADA pela busca (padrão comum: busca "ana",
+	// marca "selecionar todos", seleciona só quem apareceu filtrado — não a base inteira de
+	// usuários escondida pelo filtro).
+	const usuariosFiltrados = usuarios.filter((u) => u.nome.toLowerCase().includes(buscaDestinatario.toLowerCase()));
+	const todosFiltradosSelecionados =
+		usuariosFiltrados.length > 0 && usuariosFiltrados.every((u) => destinatariosIds.has(u.id));
+
+	function alternarTodos() {
+		setMensagemDestinatarios("");
+		setDestinatariosIds((atual) => {
+			const novo = new Set(atual);
+			if (todosFiltradosSelecionados) {
+				usuariosFiltrados.forEach((u) => novo.delete(u.id));
+			} else {
+				usuariosFiltrados.forEach((u) => novo.add(u.id));
 			}
 			return novo;
 		});
@@ -116,20 +137,38 @@ export default function HistoricoFechamentosPage() {
 					{usuarios.length === 0 ? (
 						<p className="fechamento-vazio">Nenhum usuário cadastrado.</p>
 					) : (
-						<ul className="fechamento-destinatarios-lista">
-							{usuarios.map((u) => (
-								<li key={u.id}>
-									<label>
-										<input
-											type="checkbox"
-											checked={destinatariosIds.has(u.id)}
-											onChange={() => alternarDestinatario(u.id)}
-										/>
-										{u.nome} <span className="fechamento-destinatario-email">({u.email})</span>
-									</label>
-								</li>
-							))}
-						</ul>
+						<>
+							<div className="fechamento-destinatarios-controles">
+								<input
+									type="text"
+									value={buscaDestinatario}
+									onChange={(e) => setBuscaDestinatario(e.target.value)}
+									placeholder="Buscar por nome"
+								/>
+								<label className="fechamento-destinatarios-todos">
+									<input type="checkbox" checked={todosFiltradosSelecionados} onChange={alternarTodos} />
+									Selecionar todos
+								</label>
+							</div>
+							{usuariosFiltrados.length === 0 ? (
+								<p className="fechamento-vazio">Nenhum usuário encontrado.</p>
+							) : (
+								<ul className="fechamento-destinatarios-lista">
+									{usuariosFiltrados.map((u) => (
+										<li key={u.id}>
+											<label>
+												<input
+													type="checkbox"
+													checked={destinatariosIds.has(u.id)}
+													onChange={() => alternarDestinatario(u.id)}
+												/>
+												{u.nome} <span className="fechamento-destinatario-email">({u.email})</span>
+											</label>
+										</li>
+									))}
+								</ul>
+							)}
+						</>
 					)}
 					<button type="button" className="btn btn-primary" onClick={salvarDestinatarios}>
 						Salvar destinatários

@@ -977,6 +977,31 @@ p.erro {
 	font-weight: 400;
 }
 
+.fechamento-destinatarios-controles {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	margin-bottom: 12px;
+}
+
+.fechamento-destinatarios-controles input[type="text"] {
+	width: 240px;
+}
+
+.fechamento-destinatarios-todos {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--text-secondary);
+	white-space: nowrap;
+}
+
+.fechamento-destinatarios-todos input[type="checkbox"] {
+	width: auto;
+}
+
 .relatorio-filtro-inline {
 	display: flex;
 	align-items: center;
