@@ -40,6 +40,12 @@ class Operacao {
 	@Column(name = "pr_cr_vir")
 	private String prCrVir;
 
+	// Achado de negócio (Incremento 56): valor ENVIADO na criação, não calculado — "NA"
+	// quando PR/CR/VIR é "Pronto", um número (texto) com 3 casas decimais quando é
+	// "Crédito" ou "Virtual". Ver OperacaoService.validarSpreadEmissao.
+	@Column(name = "spread_emissao")
+	private String spreadEmissao;
+
 	private String moeda;
 
 	@Column(name = "valor_me")
@@ -72,8 +78,8 @@ class Operacao {
 	}
 
 	Operacao(String idTrade, LocalDate data, String codigoBanco, Long clienteId, Long bancoId, String cv,
-			String prCrVir, String moeda, BigDecimal valorMe, BigDecimal spotAsset, BigDecimal nivelamento,
-			BigDecimal taxaFinal, Long criadoPorUsuarioId, Instant criadoEm) {
+			String prCrVir, String spreadEmissao, String moeda, BigDecimal valorMe, BigDecimal spotAsset,
+			BigDecimal nivelamento, BigDecimal taxaFinal, Long criadoPorUsuarioId, Instant criadoEm) {
 		this.idTrade = idTrade;
 		this.data = data;
 		this.codigoBanco = codigoBanco;
@@ -81,6 +87,7 @@ class Operacao {
 		this.bancoId = bancoId;
 		this.cv = cv;
 		this.prCrVir = prCrVir;
+		this.spreadEmissao = spreadEmissao;
 		this.moeda = moeda;
 		this.valorMe = valorMe;
 		this.spotAsset = spotAsset;
@@ -123,6 +130,10 @@ class Operacao {
 		return prCrVir;
 	}
 
+	String getSpreadEmissao() {
+		return spreadEmissao;
+	}
+
 	String getMoeda() {
 		return moeda;
 	}
@@ -163,7 +174,7 @@ class Operacao {
 		return completadoEm;
 	}
 
-	void editar(String codigoBanco, Long clienteId, Long bancoId, String cv, String prCrVir,
+	void editar(String codigoBanco, Long clienteId, Long bancoId, String cv, String prCrVir, String spreadEmissao,
 			String moeda, BigDecimal valorMe, BigDecimal spotAsset, BigDecimal nivelamento, BigDecimal taxaFinal) {
 		// Data não entra aqui de propósito: não pode ser editada depois de criada (pedido do usuário).
 		this.codigoBanco = codigoBanco;
@@ -171,6 +182,7 @@ class Operacao {
 		this.bancoId = bancoId;
 		this.cv = cv;
 		this.prCrVir = prCrVir;
+		this.spreadEmissao = spreadEmissao;
 		this.moeda = moeda;
 		this.valorMe = valorMe;
 		this.spotAsset = spotAsset;

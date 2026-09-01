@@ -39,13 +39,15 @@ class OperacaoService {
 		if (!bancoRepository.existsById(request.bancoId())) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Banco informado não existe");
 		}
+		validarSpreadEmissao(request.prCrVir(), request.spreadEmissao());
 
 		String idTrade = gerarIdTrade(request.data().getYear());
 		Instant agora = Instant.now();
 
 		Operacao operacao = new Operacao(idTrade, request.data(), request.codigoBanco(), request.clienteId(),
-				request.bancoId(), request.cv(), request.prCrVir(), request.moeda(), request.valorMe(),
-				request.spotAsset(), request.nivelamento(), request.taxaFinal(), criadoPorUsuarioId, agora);
+				request.bancoId(), request.cv(), request.prCrVir(), request.spreadEmissao(), request.moeda(),
+				request.valorMe(), request.spotAsset(), request.nivelamento(), request.taxaFinal(),
+				criadoPorUsuarioId, agora);
 		operacao = repository.save(operacao);
 
 		eventoService.registrar(TipoEventoOperacao.CRIADA, operacao.getId(), criadoPorUsuarioId, agora,
@@ -64,17 +66,45 @@ class OperacaoService {
 		if (!bancoRepository.existsById(request.bancoId())) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Banco informado não existe");
 		}
+		validarSpreadEmissao(request.prCrVir(), request.spreadEmissao());
 
 		OperacaoSnapshot dadosAnteriores = OperacaoSnapshot.de(operacao, nomeCliente(operacao.getClienteId()),
 				nomeBanco(operacao.getBancoId()));
 		operacao.editar(request.codigoBanco(), request.clienteId(), request.bancoId(), request.cv(),
-				request.prCrVir(), request.moeda(), request.valorMe(), request.spotAsset(), request.nivelamento(),
-				request.taxaFinal());
+				request.prCrVir(), request.spreadEmissao(), request.moeda(), request.valorMe(), request.spotAsset(),
+				request.nivelamento(), request.taxaFinal());
 		operacao = repository.save(operacao);
 
 		eventoService.registrar(TipoEventoOperacao.EDITADA, operacao.getId(), usuarioId, Instant.now(),
 				dadosAnteriores);
 		return operacao;
+	}
+
+	// Achado de negócio (Incremento 56): Spread emissão não é calculado — vem no próprio
+	// request, e precisa ser consistente com o tipo da ordem (PR/CR/VIR): "NA" quando é
+	// "Pronto" (único tipo que a tela de Registrar Operação consegue criar); um número
+	// quando é qualquer outro tipo (Crédito/Virtual, só alcançáveis via API — a tela não
+	// oferece essas opções). Rejeitado com 400 quando a combinação não bate, pra não
+	// deixar dado inconsistente entrar no banco.
+	private void validarSpreadEmissao(String prCrVir, String spreadEmissao) {
+		boolean pronto = "Pronto".equalsIgnoreCase(prCrVir);
+		boolean valorNA = "NA".equalsIgnoreCase(spreadEmissao);
+		if (pronto && !valorNA) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+					"Spread emissão deve ser \"NA\" quando o tipo da ordem é Pronto");
+		}
+		if (!pronto) {
+			if (valorNA) {
+				throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+						"Spread emissão deve ser um número quando o tipo da ordem não é Pronto");
+			}
+			try {
+				new BigDecimal(spreadEmissao);
+			} catch (NumberFormatException e) {
+				throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+						"Spread emissão precisa ser um número válido quando o tipo da ordem não é Pronto");
+			}
+		}
 	}
 
 	private String gerarIdTrade(int ano) {

@@ -8,12 +8,16 @@ import CurrencyPicker from "../components/CurrencyPicker";
 import SearchPicker from "../components/SearchPicker";
 import { formatarData } from "../utils/data";
 
+// spreadEmissao não tem campo nenhum na tela (pedido do usuário) — sempre "NA" aqui,
+// porque a tela só cria/edita operações com prCrVir "Pronto" (Crédito/Virtual só entram
+// via API direto, e aí sim precisam de um valor numérico real — ver docs/dominio.md).
 const FORM_VAZIO = {
 	data: "",
 	clienteId: "",
 	bancoId: "",
 	cv: "",
 	prCrVir: "Pronto",
+	spreadEmissao: "NA",
 	moeda: "",
 	valorMe: "",
 	spotAsset: "",
@@ -111,6 +115,7 @@ export default function OperacoesPage() {
 			bancoId: String(op.bancoId),
 			cv: op.cv,
 			prCrVir: op.prCrVir,
+			spreadEmissao: op.spreadEmissao,
 			moeda: op.moeda,
 			valorMe: String(op.valorMe),
 			spotAsset: String(op.spotAsset),

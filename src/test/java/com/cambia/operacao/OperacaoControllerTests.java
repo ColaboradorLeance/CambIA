@@ -72,7 +72,7 @@ class OperacaoControllerTests {
 	private String operacaoJson() {
 		return """
 				{"data":"2026-07-02","codigoBanco":"143258","clienteId":%d,"bancoId":%d,"cv":"V","prCrVir":"Credito",
-				"moeda":"USD","valorMe":885242.40,"spotAsset":5.1990,"nivelamento":5.1960,"taxaFinal":5.1856}
+				"spreadEmissao":"0.020","moeda":"USD","valorMe":885242.40,"spotAsset":5.1990,"nivelamento":5.1960,"taxaFinal":5.1856}
 				""".formatted(clienteId, bancoId);
 	}
 
@@ -171,7 +171,7 @@ class OperacaoControllerTests {
 	void rejeitaClienteInexistente() throws Exception {
 		String json = """
 				{"data":"2026-07-02","clienteId":999999,"bancoId":%d,"cv":"V","prCrVir":"Credito",
-				"moeda":"USD","valorMe":100.00,"spotAsset":5.10,"nivelamento":5.10,"taxaFinal":5.10}
+				"spreadEmissao":"0.020","moeda":"USD","valorMe":100.00,"spotAsset":5.10,"nivelamento":5.10,"taxaFinal":5.10}
 				""".formatted(bancoId);
 
 		mockMvc.perform(post("/operacoes")
@@ -185,7 +185,7 @@ class OperacaoControllerTests {
 	void rejeitaBancoInexistente() throws Exception {
 		String json = """
 				{"data":"2026-07-02","clienteId":%d,"bancoId":999999,"cv":"V","prCrVir":"Credito",
-				"moeda":"USD","valorMe":100.00,"spotAsset":5.10,"nivelamento":5.10,"taxaFinal":5.10}
+				"spreadEmissao":"0.020","moeda":"USD","valorMe":100.00,"spotAsset":5.10,"nivelamento":5.10,"taxaFinal":5.10}
 				""".formatted(clienteId);
 
 		mockMvc.perform(post("/operacoes")
@@ -199,7 +199,7 @@ class OperacaoControllerTests {
 	void rejeitaSemValorEmMe() throws Exception {
 		String json = """
 				{"data":"2026-07-02","clienteId":%d,"bancoId":%d,"cv":"V","prCrVir":"Credito",
-				"moeda":"USD","spotAsset":5.10,"nivelamento":5.10,"taxaFinal":5.10}
+				"spreadEmissao":"0.020","moeda":"USD","spotAsset":5.10,"nivelamento":5.10,"taxaFinal":5.10}
 				""".formatted(clienteId, bancoId);
 
 		mockMvc.perform(post("/operacoes")
@@ -213,7 +213,7 @@ class OperacaoControllerTests {
 	void rejeitaSpotAssetComMaisDeQuatroCasasDecimais() throws Exception {
 		String json = """
 				{"data":"2026-07-02","clienteId":%d,"bancoId":%d,"cv":"V","prCrVir":"Credito",
-				"moeda":"USD","valorMe":100.00,"spotAsset":5.19999,"nivelamento":5.10,"taxaFinal":5.10}
+				"spreadEmissao":"0.020","moeda":"USD","valorMe":100.00,"spotAsset":5.19999,"nivelamento":5.10,"taxaFinal":5.10}
 				""".formatted(clienteId, bancoId);
 
 		// O corpo do erro precisa dizer qual campo falhou e por quê (não só "400 Bad Request"),
@@ -230,7 +230,7 @@ class OperacaoControllerTests {
 	void rejeitaNivelamentoComMaisDeQuatroCasasDecimais() throws Exception {
 		String json = """
 				{"data":"2026-07-02","clienteId":%d,"bancoId":%d,"cv":"V","prCrVir":"Credito",
-				"moeda":"USD","valorMe":100.00,"spotAsset":5.10,"nivelamento":5.19999,"taxaFinal":5.10}
+				"spreadEmissao":"0.020","moeda":"USD","valorMe":100.00,"spotAsset":5.10,"nivelamento":5.19999,"taxaFinal":5.10}
 				""".formatted(clienteId, bancoId);
 
 		mockMvc.perform(post("/operacoes")
@@ -244,7 +244,7 @@ class OperacaoControllerTests {
 	void aceitaSpotAssetENivelamentoComExatamenteQuatroCasasDecimais() throws Exception {
 		String json = """
 				{"data":"2026-07-02","clienteId":%d,"bancoId":%d,"cv":"V","prCrVir":"Credito",
-				"moeda":"USD","valorMe":100.00,"spotAsset":5.1999,"nivelamento":5.1234,"taxaFinal":5.10}
+				"spreadEmissao":"0.020","moeda":"USD","valorMe":100.00,"spotAsset":5.1999,"nivelamento":5.1234,"taxaFinal":5.10}
 				""".formatted(clienteId, bancoId);
 
 		mockMvc.perform(post("/operacoes")
@@ -290,7 +290,7 @@ class OperacaoControllerTests {
 	void completarOperacaoComCvDesconhecidoCalculaSoOReais() throws Exception {
 		String json = """
 				{"data":"2026-07-02","clienteId":%d,"bancoId":%d,"cv":"NA","prCrVir":"Virtual",
-				"moeda":"USD","valorMe":1000.00,"spotAsset":5.10,"nivelamento":5.10,"taxaFinal":5.00}
+				"spreadEmissao":"0.020","moeda":"USD","valorMe":1000.00,"spotAsset":5.10,"nivelamento":5.10,"taxaFinal":5.00}
 				""".formatted(clienteId, bancoId);
 		String location = criarOperacao(json);
 

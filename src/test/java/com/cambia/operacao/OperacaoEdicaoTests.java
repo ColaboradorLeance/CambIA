@@ -77,7 +77,7 @@ class OperacaoEdicaoTests {
 
 	private String criarOperacao(Long clienteId, Long bancoId, String valorMe) throws Exception {
 		String json = """
-				{"data":"2026-08-26","clienteId":%d,"bancoId":%d,"cv":"V","prCrVir":"Credito","moeda":"USD",
+				{"data":"2026-08-26","clienteId":%d,"bancoId":%d,"cv":"V","prCrVir":"Credito","spreadEmissao":"0.020","moeda":"USD",
 				"valorMe":%s,"spotAsset":5.10,"nivelamento":5.10,"taxaFinal":5.00}
 				""".formatted(clienteId, bancoId, valorMe);
 
@@ -90,7 +90,7 @@ class OperacaoEdicaoTests {
 
 	private String edicaoJson(Long clienteId, Long bancoId, String valorMe) {
 		return """
-				{"data":"2026-08-27","clienteId":%d,"bancoId":%d,"cv":"C","prCrVir":"Pronto","moeda":"EUR",
+				{"data":"2026-08-27","clienteId":%d,"bancoId":%d,"cv":"C","prCrVir":"Pronto","spreadEmissao":"NA","moeda":"EUR",
 				"valorMe":%s,"spotAsset":5.30,"nivelamento":5.30,"taxaFinal":5.10}
 				""".formatted(clienteId, bancoId, valorMe);
 	}

@@ -15,6 +15,7 @@ record OperacaoRequest(
 		@NotNull Long bancoId,
 		@NotBlank String cv,
 		@NotBlank String prCrVir,
+		@NotBlank String spreadEmissao,
 		@NotBlank String moeda,
 		@NotNull @Positive BigDecimal valorMe,
 		@NotNull @Positive @Digits(integer = 8, fraction = 4) BigDecimal spotAsset,
