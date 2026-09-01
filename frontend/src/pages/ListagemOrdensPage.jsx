@@ -17,6 +17,13 @@ function formatarMoeda(valor) {
 	return Number(valor).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 6 });
 }
 
+// Spread liquidação vem do backend como razão decimal (ex: 0.020) — a exibição em % é
+// só formatação de tela, o valor armazenado/retornado pela API continua sendo a razão.
+function formatarPercentual(razao) {
+	if (razao === null || razao === undefined) return "—";
+	return `${(Number(razao) * 100).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 3 })}%`;
+}
+
 // Data local (aaaa-mm-dd) do instante de conclusão, no fuso do navegador — pra comparar
 // com o valor de um <input type="date">, que também é sempre local.
 function dataLocalIso(instanteIso) {
@@ -148,6 +155,7 @@ export default function ListagemOrdensPage() {
 								<th>R$</th>
 								<th>Total Bruto</th>
 								<th>Valor Absoluto</th>
+								<th>Spread liquidação</th>
 								<th>Comissão</th>
 								<th>Criado por</th>
 								<th>Completado por</th>
@@ -169,6 +177,7 @@ export default function ListagemOrdensPage() {
 									<td className="mono">{formatarMoeda(op.reais)}</td>
 									<td className="mono">{formatarMoeda(op.totalBrutoCambio)}</td>
 									<td className="mono">{formatarMoeda(op.valorAbsoluto)}</td>
+									<td className="mono">{formatarPercentual(op.spreadLiquidacao)}</td>
 									<td className="mono">{formatarMoeda(op.comissaoLiquida)}</td>
 									<td>{op.criadoPorNome || "—"}</td>
 									<td>{op.completadoPorNome || "—"}</td>
