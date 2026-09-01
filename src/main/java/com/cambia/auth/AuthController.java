@@ -3,7 +3,6 @@ package com.cambia.auth;
 import java.time.Duration;
 import java.util.UUID;
 
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -139,13 +138,30 @@ class AuthController {
 				.toString());
 	}
 
+	// Achado de revisão de segurança ("olhar de hacker ético" — inconsistência de baixo
+	// risco): usava a API antiga (jakarta.servlet.http.Cookie) em vez do mesmo
+	// ResponseCookie usado pra GRAVAR esses cookies (ver definirCookiesDeSessao acima) —
+	// funcionava nos testes/curl, mas não replicava Secure/SameSite do cookie original;
+	// um navegador que leve esses atributos em conta ao decidir se apaga o cookie
+	// existente poderia, em tese, não reconhecer como o mesmo cookie. Reescrito pra usar
+	// o mesmo builder e os mesmos atributos, só com Max-Age=0 (expira imediatamente).
 	private void limparCookiesDeSessao(HttpServletResponse resposta) {
-		for (String nome : new String[] { NomesCookieAuth.SESSAO, NomesCookieAuth.CSRF }) {
-			Cookie cookie = new Cookie(nome, "");
-			cookie.setPath("/");
-			cookie.setMaxAge(0);
-			resposta.addCookie(cookie);
-		}
+		resposta.addHeader(HttpHeaders.SET_COOKIE, ResponseCookie.from(NomesCookieAuth.SESSAO, "")
+				.httpOnly(true)
+				.secure(true)
+				.sameSite("Strict")
+				.path("/")
+				.maxAge(Duration.ZERO)
+				.build()
+				.toString());
+		resposta.addHeader(HttpHeaders.SET_COOKIE, ResponseCookie.from(NomesCookieAuth.CSRF, "")
+				.httpOnly(false)
+				.secure(true)
+				.sameSite("Strict")
+				.path("/")
+				.maxAge(Duration.ZERO)
+				.build()
+				.toString());
 	}
 
 	// Achado de revisão de segurança ("login CSRF"): o cookie de vínculo só faz sentido —
@@ -173,11 +189,17 @@ class AuthController {
 				.toString());
 	}
 
+	// Mesmo motivo de limparCookiesDeSessao acima: usa o mesmo builder e os mesmos
+	// atributos de definirCookieDeVinculo, só com Max-Age=0.
 	private void limparCookieDeVinculo(HttpServletResponse resposta) {
-		Cookie cookie = new Cookie(NomesCookieAuth.VINCULO_LOGIN, "");
-		cookie.setPath("/auth");
-		cookie.setMaxAge(0);
-		resposta.addCookie(cookie);
+		resposta.addHeader(HttpHeaders.SET_COOKIE, ResponseCookie.from(NomesCookieAuth.VINCULO_LOGIN, "")
+				.httpOnly(true)
+				.secure(true)
+				.sameSite("Strict")
+				.path("/auth")
+				.maxAge(Duration.ZERO)
+				.build()
+				.toString());
 	}
 
 }
