@@ -5,12 +5,37 @@ import EmptyState from "../components/EmptyState";
 
 const FORM_VAZIO = { codigoBanco: "", sigla: "", nome: "", taxaRebate: "", calculoId: "" };
 
+// Preenchimento automático do Nome a partir do código COMPE (3 dígitos) ou ISPB
+// (8 dígitos) digitado em "Código do banco". Qualquer outro tamanho não dispara
+// consulta nenhuma (mantém o comportamento de texto livre de sempre).
+async function buscarNomePorCodigoBanco(codigo) {
+	const somenteDigitos = (codigo || "").replace(/\D/g, "");
+	if (somenteDigitos.length !== 3 && somenteDigitos.length !== 8) {
+		return { nome: null, mensagem: null };
+	}
+	try {
+		const resposta = await api.get(`/bancos/consulta-codigo/${somenteDigitos}`);
+		if (resposta.nome) {
+			return { nome: resposta.nome, mensagem: null };
+		}
+		const mensagem =
+			somenteDigitos.length === 3
+				? "Este código não participa do COMPE."
+				: "ISPB não encontrado.";
+		return { nome: null, mensagem };
+	} catch {
+		// Falha na consulta não deve atrapalhar o preenchimento manual — sem pop-up aqui.
+		return { nome: null, mensagem: null };
+	}
+}
+
 export default function BancosPage() {
 	const [bancos, setBancos] = useState([]);
 	const [calculos, setCalculos] = useState([]);
 	const [form, setForm] = useState(FORM_VAZIO);
 	const [editandoId, setEditandoId] = useState(null);
 	const [carregando, setCarregando] = useState(true);
+	const [mensagemCodigoBanco, setMensagemCodigoBanco] = useState(null);
 
 	async function carregar() {
 		setCarregando(true);
@@ -65,6 +90,15 @@ export default function BancosPage() {
 	function cancelarEdicao() {
 		setEditandoId(null);
 		setForm(FORM_VAZIO);
+		setMensagemCodigoBanco(null);
+	}
+
+	async function completarNomePeloCodigoBanco() {
+		const { nome, mensagem } = await buscarNomePorCodigoBanco(form.codigoBanco);
+		if (nome) {
+			setForm((atual) => ({ ...atual, nome }));
+		}
+		setMensagemCodigoBanco(mensagem);
 	}
 
 	async function remover(id) {
@@ -89,11 +123,16 @@ export default function BancosPage() {
 
 			<form onSubmit={salvar} className="form-cadastro-banco">
 				<input
-					placeholder="Código do banco"
+					placeholder="Código do banco (COMPE ou ISPB)"
 					value={form.codigoBanco}
-					onChange={(e) => setForm({ ...form, codigoBanco: e.target.value })}
+					onChange={(e) => {
+						setForm({ ...form, codigoBanco: e.target.value });
+						setMensagemCodigoBanco(null);
+					}}
+					onBlur={completarNomePeloCodigoBanco}
 					required
 				/>
+				{mensagemCodigoBanco && <p className="campo-aviso">{mensagemCodigoBanco}</p>}
 				<input
 					placeholder="Sigla"
 					value={form.sigla}

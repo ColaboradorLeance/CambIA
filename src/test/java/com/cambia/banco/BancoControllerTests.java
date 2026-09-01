@@ -1,5 +1,7 @@
 package com.cambia.banco;
 
+import java.util.Optional;
+
 import com.cambia.TestcontainersConfiguration;
 import com.cambia.auth.MagicLinkTokenRepository;
 import com.cambia.auth.TestAuthSupport;
@@ -13,9 +15,12 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -33,6 +38,11 @@ class BancoControllerTests {
 
 	@Autowired
 	private MagicLinkTokenRepository magicLinkTokenRepository;
+
+	// Substitui o cliente real (que chamaria a BrasilAPI de verdade pela internet) por
+	// um dublê — os testes não podem depender de rede externa.
+	@MockitoBean
+	private ConsultaBancoClient consultaBancoClient;
 
 	private String authHeader;
 	private Long calculoId;
@@ -162,6 +172,42 @@ class BancoControllerTests {
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(bancoJson("001", "BZA", "Banco BZA", "1.5", 999999L)))
 				.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void consultaCodigoDe3DigitosBuscaPorCompe() throws Exception {
+		when(consultaBancoClient.buscarNomePorCompe("001")).thenReturn(Optional.of("Banco do Brasil S.A."));
+
+		mockMvc.perform(get("/bancos/consulta-codigo/001").header("Authorization", authHeader))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.nome").value("Banco do Brasil S.A."));
+	}
+
+	@Test
+	void consultaCodigoDe8DigitosBuscaPorIspb() throws Exception {
+		when(consultaBancoClient.buscarNomePorIspb("60701190")).thenReturn(Optional.of("ITAÚ UNIBANCO S.A."));
+
+		mockMvc.perform(get("/bancos/consulta-codigo/60701190").header("Authorization", authHeader))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.nome").value("ITAÚ UNIBANCO S.A."));
+	}
+
+	@Test
+	void consultaCodigoRetornaNomeNuloQuandoNaoEncontrado() throws Exception {
+		when(consultaBancoClient.buscarNomePorCompe("999")).thenReturn(Optional.empty());
+
+		mockMvc.perform(get("/bancos/consulta-codigo/999").header("Authorization", authHeader))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.nome").value(org.hamcrest.Matchers.nullValue()));
+	}
+
+	@Test
+	void consultaCodigoNaoChamaAFonteDeDadosQuandoNaoTem3Nem8Digitos() throws Exception {
+		mockMvc.perform(get("/bancos/consulta-codigo/TLX").header("Authorization", authHeader))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.nome").value(org.hamcrest.Matchers.nullValue()));
+
+		verifyNoInteractions(consultaBancoClient);
 	}
 
 }

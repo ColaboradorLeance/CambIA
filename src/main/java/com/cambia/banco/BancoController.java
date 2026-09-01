@@ -20,9 +20,11 @@ import org.springframework.web.bind.annotation.RestController;
 class BancoController {
 
 	private final BancoService service;
+	private final ConsultaBancoClient consultaBancoClient;
 
-	BancoController(BancoService service) {
+	BancoController(BancoService service, ConsultaBancoClient consultaBancoClient) {
 		this.service = service;
+		this.consultaBancoClient = consultaBancoClient;
 	}
 
 	@PostMapping
@@ -40,6 +42,22 @@ class BancoController {
 	@GetMapping
 	List<BancoResponse> listar() {
 		return service.listar().stream().map(BancoResponse::from).toList();
+	}
+
+	// Preenchimento automático do Nome a partir do código COMPE (3 dígitos) ou ISPB
+	// (8 dígitos) digitado em "Código do banco" (Incremento 43). Sempre responde 200,
+	// mesmo sem achar nada: é um preenchimento de conveniência, nunca deve travar o
+	// cadastro manual. Ver ConsultaBancoClient.
+	@GetMapping("/consulta-codigo/{codigo}")
+	ConsultaBancoResponse consultarCodigo(@PathVariable String codigo) {
+		String somenteDigitos = codigo.replaceAll("\\D", "");
+		if (somenteDigitos.length() == 3) {
+			return new ConsultaBancoResponse(consultaBancoClient.buscarNomePorCompe(somenteDigitos).orElse(null));
+		}
+		if (somenteDigitos.length() == 8) {
+			return new ConsultaBancoResponse(consultaBancoClient.buscarNomePorIspb(somenteDigitos).orElse(null));
+		}
+		return new ConsultaBancoResponse(null);
 	}
 
 	@PutMapping("/{id}")

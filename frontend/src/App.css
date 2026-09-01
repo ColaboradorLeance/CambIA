@@ -298,6 +298,12 @@ button:disabled {
 	max-width: 640px;
 }
 
+.campo-aviso {
+	margin: -6px 0 0;
+	font-size: 12px;
+	color: var(--text-muted);
+}
+
 .form-operacao,
 .relatorio-filtros {
 	display: grid;
