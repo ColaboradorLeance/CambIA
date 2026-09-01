@@ -26,16 +26,16 @@ class AuthService {
 	private final MagicLinkTokenRepository magicLinkTokenRepository;
 	private final SessaoRepository sessaoRepository;
 	private final BootstrapLockRepository bootstrapLockRepository;
-	private final MagicLinkSender sender;
+	private final MagicLinkEnvioAssincrono envioAssincrono;
 
 	AuthService(UsuarioRepository usuarioRepository, MagicLinkTokenRepository magicLinkTokenRepository,
 			SessaoRepository sessaoRepository, BootstrapLockRepository bootstrapLockRepository,
-			MagicLinkSender sender) {
+			MagicLinkEnvioAssincrono envioAssincrono) {
 		this.usuarioRepository = usuarioRepository;
 		this.magicLinkTokenRepository = magicLinkTokenRepository;
 		this.sessaoRepository = sessaoRepository;
 		this.bootstrapLockRepository = bootstrapLockRepository;
-		this.sender = sender;
+		this.envioAssincrono = envioAssincrono;
 	}
 
 	// Achado de revisão de segurança: "count() > 0, depois insere" sozinho não é atômico —
@@ -65,13 +65,16 @@ class AuthService {
 		sessaoRepository.findByToken(token).ifPresent(sessaoRepository::delete);
 	}
 
+	// Achado de revisão de segurança: o envio roda em segundo plano (MagicLinkEnvioAssincrono)
+	// pra não deixar o tempo de resposta variar conforme o e-mail existe ou não — a parte
+	// mais lenta (o SMTP de verdade) deixa de bloquear a resposta HTTP.
 	void solicitarLink(String email) {
 		usuarioRepository.findByEmail(email).ifPresent(usuario -> {
 			String token = UUID.randomUUID().toString();
 			MagicLinkToken magicLinkToken = new MagicLinkToken(usuario.getId(), token,
 					Instant.now().plus(VALIDADE_MAGIC_LINK));
 			magicLinkTokenRepository.save(magicLinkToken);
-			sender.enviar(email, token);
+			envioAssincrono.enviar(email, token);
 		});
 	}
 

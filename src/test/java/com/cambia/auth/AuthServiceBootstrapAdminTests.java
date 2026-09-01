@@ -30,7 +30,7 @@ class AuthServiceBootstrapAdminTests {
 	private final UsuarioRepository usuarioRepository = mock(UsuarioRepository.class);
 	private final BootstrapLockRepository bootstrapLockRepository = mock(BootstrapLockRepository.class);
 	private final AuthService service = new AuthService(usuarioRepository, mock(MagicLinkTokenRepository.class),
-			mock(SessaoRepository.class), bootstrapLockRepository, mock(MagicLinkSender.class));
+			mock(SessaoRepository.class), bootstrapLockRepository, mock(MagicLinkEnvioAssincrono.class));
 
 	private static final BootstrapAdminRequest REQUEST = new BootstrapAdminRequest("Admin", "admin@cambia.com.br");
 
