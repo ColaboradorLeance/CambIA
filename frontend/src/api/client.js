@@ -1,6 +1,13 @@
 import { mostrarErroGlobal, agendarErroAposRedirecionamento } from "../utils/toastBus";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
+// "" (vazio, o padrão a partir da Fase 3A da revisão de segurança) significa "mesma
+// origem da página" — path relativo, funciona quando front-end e backend estão atrás
+// do mesmo reverse-proxy HTTPS. Só é preciso um valor aqui quando NÃO há reverse-proxy
+// (backend numa porta própria, endereço diferente da página) — ver README.md.
+// Atenção: "??" aqui é proposital, não "||" — string vazia é um valor válido e
+// diferente de "não veio nada" (import.meta.env.VITE_API_URL nunca é undefined depois
+// do build do Vite, mas o "??" deixa a intenção clara mesmo assim).
+const API_URL = import.meta.env.VITE_API_URL ?? "";
 
 async function request(path, options = {}) {
 	const headers = { "Content-Type": "application/json", ...(options.headers || {}) };

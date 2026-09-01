@@ -20,12 +20,12 @@ Núcleo do backend completo (Cliente, Banco, Usuário, Autenticação, Operaçã
 
 ## Subindo o sistema com Docker Compose (caminho recomendado)
 
-É a forma como o sistema é distribuído: três serviços (`backend`, `frontend`, `db`) mais um `mailpit` opcional para testar e-mail, todos definidos em [docker-compose.yml](docker-compose.yml).
+É a forma como o sistema é distribuído: um `reverse-proxy` HTTPS na frente, três serviços internos (`backend`, `frontend`, `db`) e um `mailpit` opcional para testar e-mail, todos definidos em [docker-compose.yml](docker-compose.yml). O `reverse-proxy` é o **único ponto de entrada exposto no host** — front-end e backend não são mais alcançáveis direto de fora (Fase 3A da revisão de segurança).
 
 ### 1. Pré-requisitos na máquina/servidor
 
 - [Docker Engine](https://docs.docker.com/engine/install/) e [Docker Compose plugin](https://docs.docker.com/compose/install/) (`docker compose version` deve funcionar; no Windows/Mac, instalar o Docker Desktop já traz os dois).
-- Portas livres: `5173` (front-end), `8080` (API backend), `5432` (Postgres) e, se for usar o Mailpit, `8025`/`1025`.
+- Portas livres: `443` e `80` (reverse-proxy HTTPS), `5432` (Postgres) e, se for usar o Mailpit, `8025`/`1025`.
 - Git, para clonar o repositório.
 
 ### 2. Obter o código
@@ -43,24 +43,25 @@ Copie o modelo e ajuste os valores antes de subir:
 cp .env.example .env
 ```
 
-Edite o `.env` com um editor de texto. **O mais importante para funcionar fora do `localhost` é `VITE_API_URL`** — leia a explicação abaixo antes de seguir. Os demais campos (envio de e-mail) já funcionam com um padrão razoável para começar a testar (link de acesso aparece no log do backend, sem precisar de SMTP configurado).
+Edite o `.env` com um editor de texto. **O mais importante para acessar de outra máquina é `CERT_CN`** — leia a explicação abaixo antes de seguir. Os demais campos (envio de e-mail) já funcionam com um padrão razoável para começar a testar (link de acesso aparece no log do backend, sem precisar de SMTP configurado).
 
 Além disso, **troque `POSTGRES_PASSWORD`** por uma senha forte antes de rodar num servidor real — o padrão (`cambia`) existe só pra não quebrar quem já está usando em dev, mas a porta `5432` do Postgres fica publicada no host por padrão (ver limitações conhecidas, mais abaixo).
 
-#### `VITE_API_URL` — o endereço que o navegador do usuário usa para falar com o backend
+#### `CERT_CN` — o nome/IP do servidor gravado no certificado HTTPS
 
-O front-end é um site estático: o endereço da API fica **gravado dentro dos arquivos JavaScript no momento do build** (`docker compose build`), não é lido em tempo de execução. Isso significa:
+O `reverse-proxy` gera um certificado autoassinado sozinho na primeira subida (guardado num volume Docker, não é regerado nas próximas vezes). O nome/IP nele precisa bater com o endereço que o navegador vai usar pra acessar:
 
-- **Testando na mesma máquina onde rodou o `docker compose up`**: não precisa mudar nada, o padrão `http://localhost:8080` já funciona, porque "localhost" ali é resolvido pelo navegador de quem está acessando.
-- **Rodando num servidor e acessando de outras máquinas na rede** (o caso real de produção): `localhost` no navegador de quem acessa aponta pro próprio computador do usuário, não para o servidor — as chamadas à API vão falhar. É obrigatório definir no `.env`, **antes de buildar**:
+- **Testando na mesma máquina**: não precisa mudar nada, o padrão `CERT_CN=localhost` já funciona.
+- **Rodando num servidor e acessando de outras máquinas na rede**: defina no `.env`, **antes da primeira subida**:
 
   ```
-  VITE_API_URL=http://IP-OU-DOMINIO-DO-SERVIDOR:8080
+  CERT_CN=IP-OU-DOMINIO-DO-SERVIDOR
   ```
 
-  Trocando `IP-OU-DOMINIO-DO-SERVIDOR` pelo endereço com que as máquinas dos usuários enxergam o servidor na rede (ex: `http://192.168.1.50:8080` ou um domínio interno).
+  Trocando pelo endereço com que as máquinas dos usuários enxergam o servidor na rede (ex: `192.168.1.50` ou um domínio interno). Se precisar trocar depois de já ter subido uma vez, apague o volume do certificado pra forçar gerar um novo: `docker compose down && docker volume rm cambia_reverse_proxy_certs` (o nome exato do volume pode variar — confira com `docker volume ls`).
 
-- Se o valor de `VITE_API_URL` mudar depois, é preciso rebuildar o front-end (`docker compose up -d --build frontend`) — só reiniciar o container não é suficiente, pois o arquivo já foi gerado com o endereço antigo.
+- **Certificado autoassinado**: o navegador vai mostrar um aviso de "conexão não segura" na primeira visita — é esperado (não é um certificado emitido por uma autoridade confiável), aceite o aviso pra continuar. Se sua empresa tiver uma CA própria ou um domínio público de verdade, dá pra trocar por um certificado real substituindo os arquivos em `reverse-proxy/` — fora do escopo deste guia.
+- `VITE_API_URL` **não precisa ser definido** — o padrão (vazio) já funciona, porque front-end e backend ficam atrás do mesmo `reverse-proxy` (mesma origem). Só preencha isso se estiver rodando sem o reverse-proxy.
 
 ### 4. Subir os containers
 
@@ -77,17 +78,17 @@ docker compose logs -f backend
 ### 5. Verificar que subiu
 
 ```bash
-curl http://localhost:8080/actuator/health
+curl -k https://localhost/actuator/health
 ```
 
-Deve responder `{"status":"UP", ...}` com o componente `db` também `UP`. O front-end fica em `http://localhost:5173` (ou `http://SEU_SERVIDOR:5173` a partir de outra máquina).
+(o `-k` ignora o aviso do certificado autoassinado — só pra linha de comando; no navegador, ver nota sobre `CERT_CN` acima). Deve responder `{"status":"UP"}`. O sistema inteiro fica em `https://localhost` (ou `https://SEU_SERVIDOR` a partir de outra máquina) — não existe mais porta separada pro front-end.
 
 ### 6. Criar o primeiro usuário (Admin)
 
 O sistema não vem com nenhum usuário cadastrado. O primeiro Admin é criado por um endpoint que **só funciona uma única vez**, enquanto não existir nenhum usuário no banco:
 
 ```bash
-curl -X POST http://localhost:8080/auth/bootstrap-admin \
+curl -k -X POST https://localhost/auth/bootstrap-admin \
   -H "Content-Type: application/json" \
   -d '{"nome":"Seu Nome","email":"voce@suaempresa.com.br"}'
 ```
@@ -96,7 +97,7 @@ Depois disso, esse endpoint passa a responder `409 Conflict` — novos usuários
 
 ### 7. Fazer login (sem senha, por link mágico)
 
-1. Acesse `http://localhost:5173` (ou o endereço do servidor) — vai redirecionar para `/login`.
+1. Acesse `https://localhost` (ou o endereço do servidor) — vai redirecionar para `/login`. Aceite o aviso do certificado autoassinado na primeira visita.
 2. Digite o e-mail cadastrado e clique em "Enviar link de acesso".
 3. **Enquanto o envio real de e-mail (SMTP) não estiver configurado** (ver seção abaixo), o link não chega por e-mail de verdade — ele aparece no log do backend:
 
@@ -107,7 +108,7 @@ Depois disso, esse endpoint passa a responder `409 Conflict` — novos usuários
    Vai aparecer algo como `Link mágico para voce@suaempresa.com.br: /auth/verify?token=xxxxxxxx-...`. Copie só o valor depois de `token=`.
 4. Cole esse valor no campo "Token" da tela e clique em "Entrar".
 
-A sessão dura 8 horas (token opaco, sem cookies) e cada link mágico expira em 15 minutos ou no primeiro uso.
+A sessão dura 8 horas (token opaco, sem cookies) e cada link mágico expira em 15 minutos ou no primeiro uso. Tentativas repetidas de login (por e-mail ou por IP) têm um limite — depois de algumas tentativas seguidas, é preciso esperar alguns minutos.
 
 ---
 
@@ -171,6 +172,7 @@ src/main/java/com/cambia/    Backend (Spring Boot) — um pacote por domínio (c
 src/main/resources/db/migration/   Migrações Flyway (versionadas, nunca editar uma já aplicada)
 src/test/java/com/cambia/    Testes (JUnit 5 + Testcontainers)
 frontend/src/                Front-end (React + Vite)
+reverse-proxy/                Reverse proxy HTTPS (Nginx) — único ponto de entrada exposto no host
 docs/                        Documentação de domínio, decisões, pendências e roadmap (ver abaixo)
 docker-compose.yml           Orquestração dos containers para rodar o sistema completo
 ```
@@ -184,7 +186,7 @@ docker-compose.yml           Orquestração dos containers para rodar o sistema 
 
 ## Limitações conhecidas antes de um uso em produção "real"
 
-- **Sem HTTPS/reverse proxy configurado.** O `docker-compose.yml` expõe a API e o front-end diretamente em HTTP. Para acesso de fora da rede local, é necessário colocar um reverse proxy (ex: Nginx ou Caddy na frente) com TLS antes de expor o servidor à internet.
+- **Certificado HTTPS autoassinado por padrão.** O `reverse-proxy` gera um certificado sozinho (ver `CERT_CN` acima) — funciona (o tráfego é criptografado de verdade), mas o navegador mostra um aviso de "conexão não segura" na primeira visita, já que não é emitido por uma autoridade confiável. Pra eliminar o aviso, é preciso trocar por um certificado de uma CA de verdade (interna da empresa, ou pública se houver domínio) — fora do escopo do setup automático atual.
 - **Senha do Postgres com valor padrão fraco** (`cambia`) — configurável via `POSTGRES_PASSWORD` no `.env` (ver `.env.example`), mas o padrão continua fraco pra não quebrar quem já usa em dev. **Troque antes de expor o serviço além do localhost** — a porta `5432` fica publicada no host por padrão.
 - **Envio real de e-mail (SMTP)** depende de credenciais próprias da empresa (ver seção acima) — sem isso, login exige acesso aos logs do backend para pegar o token manualmente.
 - Sem rotina automatizada de backup do banco — só o comando manual de `pg_dump` citado acima.

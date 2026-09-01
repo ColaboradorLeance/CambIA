@@ -38,8 +38,10 @@ services:
       SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD:-}
       SPRING_MAIL_SMTP_AUTH: ${SPRING_MAIL_SMTP_AUTH:-true}
       SPRING_MAIL_SMTP_STARTTLS: ${SPRING_MAIL_SMTP_STARTTLS:-true}
-    ports:
-      - "8080:8080"
+    # Achado de revisão de segurança (Fase 3A): não publica mais a porta 8080 direto no
+    # host — só o "reverse-proxy" (HTTPS) fica exposto de fora. Continua alcançável
+    # normalmente por outros containers da mesma rede (ex: reverse-proxy) pelo nome
+    # "backend", sem precisar de "ports" pra isso.
     depends_on:
       db:
         condition: service_healthy
@@ -48,16 +50,37 @@ services:
     build:
       context: ./frontend
       args:
-        # Endereço em que o NAVEGADOR do usuário vai acessar o backend — não é o
-        # endereço interno do container. Em localhost o padrão já funciona; num
-        # servidor real, defina VITE_API_URL no .env (ex: http://SEU_SERVIDOR:8080)
-        # antes de buildar, senão o front-end tenta falar com o localhost de quem
-        # estiver acessando pelo navegador. Ver README.md.
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:8080}
-    ports:
-      - "5173:80"
+        # Endereço em que o NAVEGADOR do usuário vai acessar o backend. Com o
+        # reverse-proxy (Fase 3A), front-end e backend viram a MESMA origem — path
+        # relativo (vazio) funciona e é o padrão agora. Só defina VITE_API_URL no .env
+        # se estiver rodando SEM o reverse-proxy (ex: acessando o backend direto numa
+        # porta própria) — ver README.md.
+        VITE_API_URL: ${VITE_API_URL:-}
+    # Achado de revisão de segurança (Fase 3A): idem ao backend — não publica mais
+    # porta direto no host, só alcançável via reverse-proxy.
     depends_on:
       - backend
+
+  # Reverse proxy HTTPS (Fase 3A da revisão de segurança) — único ponto de entrada
+  # exposto no host. Termina TLS (certificado autoassinado gerado automaticamente na
+  # primeira subida, guardado no volume "reverse_proxy_certs") e encaminha por prefixo
+  # de caminho: /auth, /clientes, /bancos, etc. -> backend; o resto -> frontend. HTTP
+  # (porta 80) só existe pra redirecionar pra HTTPS. Ver reverse-proxy/README ou
+  # docs/decisoes.md pra detalhes e como trocar por um certificado de verdade.
+  reverse-proxy:
+    build: ./reverse-proxy
+    environment:
+      # Nome/IP do servidor no certificado — troque no .env em produção
+      # (ex: CERT_CN=192.168.1.50 ou CERT_CN=cambia.suaempresa.local).
+      CERT_CN: ${CERT_CN:-localhost}
+    volumes:
+      - reverse_proxy_certs:/etc/nginx/certs
+    ports:
+      - "443:443"
+      - "80:80"
+    depends_on:
+      - backend
+      - frontend
 
   # Servidor SMTP de teste: captura os e-mails enviados pelo backend sem entregar a
   # ninguem de verdade. Interface web em http://localhost:8025. Util pra testar o envio
@@ -71,3 +94,4 @@ services:
 
 volumes:
   db_data:
+  reverse_proxy_certs:
