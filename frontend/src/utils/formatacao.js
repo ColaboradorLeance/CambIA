@@ -24,3 +24,14 @@ export function formatarSpreadEmissao(valor) {
 	if (valor.toUpperCase() === "NA") return "NA";
 	return formatarPercentual(valor);
 }
+
+// Achado de negócio (Incremento 62): Fundo é derivado direto do tipo da ordem (PR/CR/VIR)
+// — "P" quando é câmbio pronto, "M" pros outros tipos (Crédito/Virtual). Não depende de
+// nenhum dado novo nem precisa vir da API — é só uma tradução do prCrVir que a Operação já
+// tem, calculada aqui pra aparecer igual nas duas telas (Em andamento e Confirmadas), do
+// mesmo jeito que Custo (Incremento 57) e Spread emissão (Incremento 56) já usam esse
+// mesmo campo pra decidir o próprio valor.
+export function calcularFundo(prCrVir) {
+	if (prCrVir === null || prCrVir === undefined) return "—";
+	return prCrVir.toLowerCase() === "pronto" ? "P" : "M";
+}

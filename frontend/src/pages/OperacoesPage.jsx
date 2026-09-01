@@ -7,7 +7,7 @@ import ConfirmModal from "../components/ConfirmModal";
 import CurrencyPicker from "../components/CurrencyPicker";
 import SearchPicker from "../components/SearchPicker";
 import { formatarData, formatarDataHora } from "../utils/data";
-import { formatarMoeda, formatarPercentual, formatarSpreadEmissao } from "../utils/formatacao";
+import { formatarMoeda, formatarPercentual, formatarSpreadEmissao, calcularFundo } from "../utils/formatacao";
 
 // spreadEmissao não tem campo nenhum na tela (pedido do usuário) — sempre "NA" aqui,
 // porque a tela só cria/edita operações com prCrVir "Pronto" (Crédito/Virtual só entram
@@ -346,6 +346,7 @@ export default function OperacoesPage() {
 						<th>Banco</th>
 						<th>C/V</th>
 						<th>Tipo</th>
+						<th>Fundo</th>
 						<th>Moeda</th>
 						<th>Valor ME</th>
 						<th>R$</th>
@@ -371,6 +372,7 @@ export default function OperacoesPage() {
 							<td>{op.bancoNome || `#${op.bancoId}`}</td>
 							<td>{op.cv}</td>
 							<td>{op.prCrVir}</td>
+							<td>{calcularFundo(op.prCrVir)}</td>
 							<td>{op.moeda}</td>
 							<td className="mono">{formatarMoeda(op.valorMe)}</td>
 							{/* Campos calculados — ficam vazios ("—") enquanto a ordem está Em andamento;

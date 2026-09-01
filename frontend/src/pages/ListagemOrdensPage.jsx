@@ -3,7 +3,7 @@ import { api } from "../api/client";
 import LoadingState from "../components/LoadingState";
 import EmptyState from "../components/EmptyState";
 import { formatarData, formatarDataHora } from "../utils/data";
-import { formatarMoeda, formatarPercentual, formatarSpreadEmissao } from "../utils/formatacao";
+import { formatarMoeda, formatarPercentual, formatarSpreadEmissao, calcularFundo } from "../utils/formatacao";
 
 const FILTROS_VAZIOS = {
 	dataFechamento: "",
@@ -169,6 +169,7 @@ export default function ListagemOrdensPage() {
 								<th>Banco</th>
 								<th>C/V</th>
 								<th>Tipo</th>
+								<th>Fundo</th>
 								<th>Moeda</th>
 								<th>Valor ME</th>
 								<th>R$</th>
@@ -193,6 +194,7 @@ export default function ListagemOrdensPage() {
 									<td>{op.bancoNome || `#${op.bancoId}`}</td>
 									<td>{op.cv}</td>
 									<td>{op.prCrVir}</td>
+									<td>{calcularFundo(op.prCrVir)}</td>
 									<td>{op.moeda}</td>
 									<td className="mono">{formatarMoeda(op.valorMe)}</td>
 									<td className="mono">{formatarMoeda(op.reais)}</td>
