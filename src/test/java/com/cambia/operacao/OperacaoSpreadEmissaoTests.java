@@ -78,10 +78,11 @@ class OperacaoSpreadEmissaoTests {
 	}
 
 	private String operacaoJson(String prCrVir, String spreadEmissao) {
+		String fundo = "Pronto".equalsIgnoreCase(prCrVir) ? "P" : "M";
 		return """
-				{"data":"2026-09-01","clienteId":%d,"bancoId":%d,"cv":"V","prCrVir":"%s","spreadEmissao":"%s",
+				{"data":"2026-09-01","clienteId":%d,"bancoId":%d,"cv":"V","prCrVir":"%s","fundo":"%s","spreadEmissao":"%s",
 				"moeda":"USD","valorMe":1000,"spotAsset":5.10,"nivelamento":5.10,"taxaFinal":5.00}
-				""".formatted(clienteId, bancoId, prCrVir, spreadEmissao);
+				""".formatted(clienteId, bancoId, prCrVir, fundo, spreadEmissao);
 	}
 
 	@Test
@@ -135,7 +136,7 @@ class OperacaoSpreadEmissaoTests {
 	@Test
 	void semSpreadEmissaoEhRejeitado() throws Exception {
 		String json = """
-				{"data":"2026-09-01","clienteId":%d,"bancoId":%d,"cv":"V","prCrVir":"Pronto",
+				{"data":"2026-09-01","clienteId":%d,"bancoId":%d,"cv":"V","prCrVir":"Pronto","fundo":"P",
 				"moeda":"USD","valorMe":1000,"spotAsset":5.10,"nivelamento":5.10,"taxaFinal":5.00}
 				""".formatted(clienteId, bancoId);
 

@@ -81,7 +81,7 @@ class RelatorioOperacoesControllerTests {
 
 	private String criarOperacao(String data, Long clienteId, Long bancoId, String cv) throws Exception {
 		String json = """
-				{"data":"%s","clienteId":%d,"bancoId":%d,"cv":"%s","prCrVir":"Credito","spreadEmissao":"0.020","moeda":"USD",
+				{"data":"%s","clienteId":%d,"bancoId":%d,"cv":"%s","prCrVir":"Credito","fundo":"M","spreadEmissao":"0.020","moeda":"USD",
 				"valorMe":1000,"spotAsset":5.10,"nivelamento":5.10,"taxaFinal":5.00}
 				""".formatted(data, clienteId, bancoId, cv);
 

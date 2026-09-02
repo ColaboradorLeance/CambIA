@@ -130,7 +130,7 @@ class TratamentoErroGlobalTests {
 						.header("Authorization", authHeader)
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
-								{"data":"2026-08-01","clienteId":%d,"bancoId":%d,"cv":"V","prCrVir":"Pronto","spreadEmissao":"NA",
+								{"data":"2026-08-01","clienteId":%d,"bancoId":%d,"cv":"V","prCrVir":"Pronto","fundo":"P","spreadEmissao":"NA",
 								"moeda":"USD","valorMe":100,"spotAsset":5.1,"nivelamento":5.1,"taxaFinal":5.1}
 								""".formatted(clienteId, bancoId)))
 				.andExpect(status().isCreated());

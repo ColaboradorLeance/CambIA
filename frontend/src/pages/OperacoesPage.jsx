@@ -9,15 +9,17 @@ import SearchPicker from "../components/SearchPicker";
 import { formatarData, formatarDataHora } from "../utils/data";
 import { formatarMoeda, formatarPercentual, formatarSpreadEmissao, calcularFundo } from "../utils/formatacao";
 
-// spreadEmissao não tem campo nenhum na tela (pedido do usuário) — sempre "NA" aqui,
-// porque a tela só cria/edita operações com prCrVir "Pronto" (Crédito/Virtual só entram
-// via API direto, e aí sim precisam de um valor numérico real — ver docs/dominio.md).
+// spreadEmissao e fundo não têm campo nenhum na tela (pedido do usuário) — sempre "NA"
+// e "P" aqui, porque a tela só cria/edita operações com prCrVir "Pronto" (Crédito/Virtual
+// só entram via API direto — e aí sim spreadEmissao precisa de um valor numérico real e
+// fundo precisa ser "M" — ver docs/dominio.md e OperacaoService.validarFundo).
 const FORM_VAZIO = {
 	data: "",
 	clienteId: "",
 	bancoId: "",
 	cv: "",
 	prCrVir: "Pronto",
+	fundo: "P",
 	spreadEmissao: "NA",
 	moeda: "",
 	valorMe: "",
@@ -118,6 +120,10 @@ export default function OperacoesPage() {
 			bancoId: String(op.bancoId),
 			cv: op.cv,
 			prCrVir: op.prCrVir,
+			// A tela não tem campo pra editar prCrVir, então fundo é recalculado a partir do
+			// valor existente (não hardcoded "P") — pra continuar correto caso a ordem sendo
+			// editada tenha sido criada via API como Crédito/Virtual (fundo "M").
+			fundo: calcularFundo(op.prCrVir),
 			spreadEmissao: op.spreadEmissao,
 			moeda: op.moeda,
 			valorMe: String(op.valorMe),

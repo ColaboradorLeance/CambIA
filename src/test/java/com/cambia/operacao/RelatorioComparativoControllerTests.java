@@ -70,7 +70,7 @@ class RelatorioComparativoControllerTests {
 
 	private String criarOperacao(String data, String valorMe, String nivelamento, String taxaFinal) throws Exception {
 		String json = """
-				{"data":"%s","clienteId":%d,"bancoId":%d,"cv":"V","prCrVir":"Credito","spreadEmissao":"0.020","moeda":"USD",
+				{"data":"%s","clienteId":%d,"bancoId":%d,"cv":"V","prCrVir":"Credito","fundo":"M","spreadEmissao":"0.020","moeda":"USD",
 				"valorMe":%s,"spotAsset":%s,"nivelamento":%s,"taxaFinal":%s}
 				""".formatted(data, clienteId, tlxId, valorMe, nivelamento, nivelamento, taxaFinal);
 
@@ -84,7 +84,7 @@ class RelatorioComparativoControllerTests {
 	private String criarOperacaoComMoeda(String data, String moeda, String valorMe, String nivelamento,
 			String taxaFinal) throws Exception {
 		String json = """
-				{"data":"%s","clienteId":%d,"bancoId":%d,"cv":"V","prCrVir":"Credito","spreadEmissao":"0.020","moeda":"%s",
+				{"data":"%s","clienteId":%d,"bancoId":%d,"cv":"V","prCrVir":"Credito","fundo":"M","spreadEmissao":"0.020","moeda":"%s",
 				"valorMe":%s,"spotAsset":%s,"nivelamento":%s,"taxaFinal":%s}
 				""".formatted(data, clienteId, tlxId, moeda, valorMe, nivelamento, nivelamento, taxaFinal);
 

@@ -40,6 +40,7 @@ class OperacaoService {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Banco informado não existe");
 		}
 		validarSpreadEmissao(request.prCrVir(), request.spreadEmissao());
+		validarFundo(request.prCrVir(), request.fundo());
 
 		String idTrade = gerarIdTrade(request.data().getYear());
 		Instant agora = Instant.now();
@@ -67,6 +68,7 @@ class OperacaoService {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Banco informado não existe");
 		}
 		validarSpreadEmissao(request.prCrVir(), request.spreadEmissao());
+		validarFundo(request.prCrVir(), request.fundo());
 
 		OperacaoSnapshot dadosAnteriores = OperacaoSnapshot.de(operacao, nomeCliente(operacao.getClienteId()),
 				nomeBanco(operacao.getBancoId()));
@@ -104,6 +106,23 @@ class OperacaoService {
 				throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
 						"Spread emissão precisa ser um número válido quando o tipo da ordem não é Pronto");
 			}
+		}
+	}
+
+	// Achado de negócio (Incremento 70): Fundo não é um campo independente — é sempre
+	// derivado do tipo da ordem (PR/CR/VIR): "P" quando é "Pronto", "M" nos demais
+	// (Crédito/Virtual). Mesmo assim, precisa vir explícito no request e bater com essa
+	// derivação (rejeitado com 400 quando não bate) — pedido do usuário pra forçar quem
+	// manda a ordem (tela ou API) a confirmar o valor certo, mesmo padrão de validação já
+	// usado pra Spread emissão acima. Não é persistido: como o valor é 100% derivável do
+	// tipo, guardar uma segunda cópia seria dado redundante.
+	private void validarFundo(String prCrVir, String fundo) {
+		boolean pronto = "Pronto".equalsIgnoreCase(prCrVir);
+		String esperado = pronto ? "P" : "M";
+		if (!esperado.equalsIgnoreCase(fundo)) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+					pronto ? "Fundo deve ser \"P\" quando o tipo da ordem é Pronto"
+							: "Fundo deve ser \"M\" quando o tipo da ordem não é Pronto");
 		}
 	}
 

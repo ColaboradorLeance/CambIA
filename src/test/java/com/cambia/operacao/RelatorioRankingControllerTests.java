@@ -85,7 +85,7 @@ class RelatorioRankingControllerTests {
 		String nivelamento = "C".equals(cv) ? "5.00" : "5.10";
 		String taxaFinal = "C".equals(cv) ? "5.10" : "5.00";
 		String json = """
-				{"data":"%s","clienteId":%d,"bancoId":%d,"cv":"%s","prCrVir":"Credito","spreadEmissao":"0.020","moeda":"%s",
+				{"data":"%s","clienteId":%d,"bancoId":%d,"cv":"%s","prCrVir":"Credito","fundo":"M","spreadEmissao":"0.020","moeda":"%s",
 				"valorMe":%s,"spotAsset":5.10,"nivelamento":%s,"taxaFinal":%s}
 				""".formatted(data, clienteId, bancoId, cv, moeda, valorMe, nivelamento, taxaFinal);
 

@@ -15,6 +15,7 @@ record OperacaoRequest(
 		@NotNull Long bancoId,
 		@NotBlank String cv,
 		@NotBlank String prCrVir,
+		@NotBlank String fundo,
 		@NotBlank String spreadEmissao,
 		@NotBlank String moeda,
 		@NotNull @Positive BigDecimal valorMe,

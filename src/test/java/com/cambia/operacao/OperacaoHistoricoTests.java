@@ -77,7 +77,7 @@ class OperacaoHistoricoTests {
 	@Test
 	void registraEventoDeCriacaoComQuemCriou() throws Exception {
 		String json = """
-				{"data":"2026-08-26","clienteId":%d,"bancoId":%d,"cv":"V","prCrVir":"Credito","spreadEmissao":"0.020","moeda":"USD",
+				{"data":"2026-08-26","clienteId":%d,"bancoId":%d,"cv":"V","prCrVir":"Credito","fundo":"M","spreadEmissao":"0.020","moeda":"USD",
 				"valorMe":1000,"spotAsset":5.10,"nivelamento":5.10,"taxaFinal":5.00}
 				""".formatted(clienteId, bancoId);
 
@@ -101,7 +101,7 @@ class OperacaoHistoricoTests {
 	@Test
 	void registraEventosDeEdicaoECompletadaComDadosAnterioresNaEdicao() throws Exception {
 		String criarJson = """
-				{"data":"2026-08-26","clienteId":%d,"bancoId":%d,"cv":"V","prCrVir":"Credito","spreadEmissao":"0.020","moeda":"USD",
+				{"data":"2026-08-26","clienteId":%d,"bancoId":%d,"cv":"V","prCrVir":"Credito","fundo":"M","spreadEmissao":"0.020","moeda":"USD",
 				"valorMe":1000,"spotAsset":5.10,"nivelamento":5.10,"taxaFinal":5.00}
 				""".formatted(clienteId, bancoId);
 		String location = mockMvc.perform(post("/operacoes")
@@ -111,7 +111,7 @@ class OperacaoHistoricoTests {
 				.andReturn().getResponse().getHeader("Location");
 
 		String edicaoJson = """
-				{"data":"2026-08-27","clienteId":%d,"bancoId":%d,"cv":"C","prCrVir":"Pronto","spreadEmissao":"NA","moeda":"EUR",
+				{"data":"2026-08-27","clienteId":%d,"bancoId":%d,"cv":"C","prCrVir":"Pronto","fundo":"P","spreadEmissao":"NA","moeda":"EUR",
 				"valorMe":500,"spotAsset":5.30,"nivelamento":5.30,"taxaFinal":5.10}
 				""".formatted(clienteId, bancoId);
 		mockMvc.perform(put(location)

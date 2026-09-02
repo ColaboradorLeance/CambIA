@@ -84,7 +84,7 @@ class OperacaoComTaxaRebateTests {
 		// venda: USD 1000, nivelamento 5.10, taxaFinal 5.00 -> Total Bruto = 100.00
 		// comissão = Total Bruto (100) * Taxa de Rebate (60%) = 60.00
 		String json = """
-				{"data":"2026-08-27","clienteId":%d,"bancoId":%d,"cv":"V","prCrVir":"Credito","spreadEmissao":"0.020","moeda":"USD",
+				{"data":"2026-08-27","clienteId":%d,"bancoId":%d,"cv":"V","prCrVir":"Credito","fundo":"M","spreadEmissao":"0.020","moeda":"USD",
 				"valorMe":1000,"spotAsset":5.10,"nivelamento":5.10,"taxaFinal":5.00}
 				""".formatted(clienteId, bancoId);
 

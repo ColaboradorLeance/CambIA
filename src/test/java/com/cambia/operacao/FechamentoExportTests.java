@@ -72,7 +72,7 @@ class FechamentoExportTests {
 		Long bancoId = ((Number) JsonPath.read(bancoBody, "$.id")).longValue();
 
 		String opJson = """
-				{"data":"2026-07-02","clienteId":%d,"bancoId":%d,"cv":"V","prCrVir":"Credito","spreadEmissao":"0.020","moeda":"USD",
+				{"data":"2026-07-02","clienteId":%d,"bancoId":%d,"cv":"V","prCrVir":"Credito","fundo":"M","spreadEmissao":"0.020","moeda":"USD",
 				"valorMe":1000,"spotAsset":5.10,"nivelamento":5.10,"taxaFinal":5.00}
 				""".formatted(clienteId, bancoId);
 
