@@ -4,6 +4,7 @@ import StatusBadge from "../components/StatusBadge";
 import LoadingState from "../components/LoadingState";
 import EmptyState from "../components/EmptyState";
 import { formatarData } from "../utils/data";
+import { formatarMoeda, calcularFundo } from "../utils/formatacao";
 
 const FILTROS_VAZIOS = {
 	periodo: "HOJE",
@@ -13,11 +14,6 @@ const FILTROS_VAZIOS = {
 	cv: "",
 	status: "",
 };
-
-function formatarMoeda(valor) {
-	if (valor === null || valor === undefined) return "—";
-	return Number(valor).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 6 });
-}
 
 function paraQueryString(filtros) {
 	const params = new URLSearchParams();
@@ -175,6 +171,7 @@ export default function RelatorioOperacoesPage() {
 								<th>Banco</th>
 								<th>C/V</th>
 								<th>Tipo</th>
+								<th>Fundo</th>
 								<th>Moeda</th>
 								<th>Valor ME</th>
 								<th>Status</th>
@@ -194,6 +191,7 @@ export default function RelatorioOperacoesPage() {
 									<td>{nomeBanco(op.bancoId)}</td>
 									<td>{op.cv}</td>
 									<td>{op.prCrVir}</td>
+									<td>{calcularFundo(op.prCrVir)}</td>
 									<td>{op.moeda}</td>
 									<td className="mono">{formatarMoeda(op.valorMe)}</td>
 									<td>
