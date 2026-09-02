@@ -37,6 +37,7 @@ class FechamentoPdfExporter {
 			documento.add(new Paragraph(" "));
 
 			documento.add(new Paragraph("Resultado financeiro (só operações completas)", SECAO));
+			documento.add(paragrafo("Quantidade de operações: " + fechamento.resultadoFinanceiro().quantidadeOperacoes()));
 			documento.add(paragrafo("Total R$: " + fmt(fechamento.resultadoFinanceiro().totalReais())));
 			documento.add(paragrafo("Total Bruto do Câmbio: " + fmt(fechamento.resultadoFinanceiro().totalBrutoCambio())));
 			documento.add(paragrafo("Comissão Líquida: " + fmt(fechamento.resultadoFinanceiro().totalComissaoLiquida())));

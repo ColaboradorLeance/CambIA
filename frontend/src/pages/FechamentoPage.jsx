@@ -112,6 +112,10 @@ export default function FechamentoPage() {
 						<h3>Resultado financeiro (só ordens confirmadas)</h3>
 						<div className="fechamento-grid">
 							<div>
+								<span className="fechamento-label">Quantidade de operações</span>
+								<span className="fechamento-valor">{fechamento.resultadoFinanceiro.quantidadeOperacoes}</span>
+							</div>
+							<div>
 								<span className="fechamento-label">Total R$</span>
 								<span className="fechamento-valor">{fmt(fechamento.resultadoFinanceiro.totalReais)}</span>
 							</div>

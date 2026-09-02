@@ -61,6 +61,8 @@ class FechamentoExcelExporter {
 			linha[0]++;
 
 			escreverSecao(sheet, linha, "Resultado financeiro (só operações completas)", estilos);
+			escreverValorTexto(sheet, linha, "Quantidade de operações",
+					fechamento.resultadoFinanceiro().quantidadeOperacoes(), estilos);
 			escreverCabecalho(sheet, linha, estilos, "Métrica", "Valor (R$)");
 			escreverLinhaTextoValor(sheet, linha, "Total R$", fechamento.resultadoFinanceiro().totalReais(), estilos);
 			escreverLinhaTextoValor(sheet, linha, "Total Bruto do Câmbio",
