@@ -14,6 +14,10 @@ const FILTROS_VAZIOS = {
 	idTrade: "",
 	cv: "",
 	tipo: "",
+	banco: "",
+	fundo: "",
+	criadoPor: "",
+	completadoPor: "",
 };
 
 // Data local (aaaa-mm-dd) do instante de conclusão, no fuso do navegador — pra comparar
@@ -66,6 +70,10 @@ export default function ListagemOrdensPage() {
 		if (!contemTexto(op.idTrade, filtros.idTrade)) return false;
 		if (!contemTexto(op.cv, filtros.cv)) return false;
 		if (!contemTexto(op.prCrVir, filtros.tipo)) return false;
+		if (!contemTexto(op.bancoNome, filtros.banco)) return false;
+		if (!contemTexto(calcularFundo(op.prCrVir), filtros.fundo)) return false;
+		if (!contemTexto(op.criadoPorNome, filtros.criadoPor)) return false;
+		if (!contemTexto(op.completadoPorNome, filtros.completadoPor)) return false;
 		return true;
 	});
 
@@ -138,6 +146,38 @@ export default function ListagemOrdensPage() {
 					<input
 						value={filtros.tipo}
 						onChange={(e) => atualizarFiltro("tipo", e.target.value)}
+						placeholder="Todos"
+					/>
+				</label>
+				<label>
+					Banco
+					<input
+						value={filtros.banco}
+						onChange={(e) => atualizarFiltro("banco", e.target.value)}
+						placeholder="Todos"
+					/>
+				</label>
+				<label>
+					Fundo
+					<input
+						value={filtros.fundo}
+						onChange={(e) => atualizarFiltro("fundo", e.target.value)}
+						placeholder="Todos"
+					/>
+				</label>
+				<label>
+					Criado por
+					<input
+						value={filtros.criadoPor}
+						onChange={(e) => atualizarFiltro("criadoPor", e.target.value)}
+						placeholder="Todos"
+					/>
+				</label>
+				<label>
+					Completado por
+					<input
+						value={filtros.completadoPor}
+						onChange={(e) => atualizarFiltro("completadoPor", e.target.value)}
 						placeholder="Todos"
 					/>
 				</label>
