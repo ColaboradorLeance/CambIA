@@ -20,7 +20,7 @@ class OperacaoCalculo {
 	private static final int ESCALA_SPREAD = 3;
 
 	static ValoresCalculados calcular(BigDecimal valorMe, BigDecimal spotAsset, BigDecimal nivelamento,
-			BigDecimal taxaFinal, String cv, String prCrVir, String formulaComissaoBanco,
+			BigDecimal taxaFinal, String cv, String prCrVir, String spreadEmissao, String formulaComissaoBanco,
 			BigDecimal taxaRebateBanco) {
 		BigDecimal reais = valorMe.multiply(taxaFinal).setScale(ESCALA, RoundingMode.HALF_UP);
 		BigDecimal valorAbsoluto = taxaFinal.subtract(nivelamento).abs().multiply(valorMe)
@@ -28,10 +28,12 @@ class OperacaoCalculo {
 		BigDecimal spreadLiquidacao = calcularSpreadLiquidacao(nivelamento, taxaFinal, cv);
 		BigDecimal custo = calcularCusto(spotAsset, taxaFinal, prCrVir);
 		BigDecimal rebate = calcularRebate(nivelamento, taxaFinal, spreadLiquidacao, prCrVir, taxaRebateBanco);
+		BigDecimal baseComissionamento = calcularBaseComissionamento(prCrVir, spreadEmissao, custo, rebate);
 
 		BigDecimal totalBrutoCambio = calcularTotalBrutoCambio(valorMe, nivelamento, taxaFinal, cv);
 		if (totalBrutoCambio == null) {
-			return new ValoresCalculados(reais, null, null, valorAbsoluto, spreadLiquidacao, custo, rebate);
+			return new ValoresCalculados(reais, null, null, valorAbsoluto, spreadLiquidacao, custo, rebate,
+					baseComissionamento);
 		}
 
 		BigDecimal comissaoLiquida = formulaComissaoBanco == null ? null
@@ -39,7 +41,7 @@ class OperacaoCalculo {
 						.setScale(ESCALA, RoundingMode.HALF_UP);
 
 		return new ValoresCalculados(reais, totalBrutoCambio, comissaoLiquida, valorAbsoluto, spreadLiquidacao, custo,
-				rebate);
+				rebate, baseComissionamento);
 	}
 
 	private static BigDecimal calcularTotalBrutoCambio(BigDecimal valorMe, BigDecimal nivelamento,
@@ -102,6 +104,30 @@ class OperacaoCalculo {
 					: spreadLiquidacao.multiply(taxaRebateBanco).setScale(ESCALA_SPREAD, RoundingMode.HALF_UP);
 		}
 		return null;
+	}
+
+	// Achado de negócio (Incremento 65): fórmula confirmada pelo usuário.
+	// Pronto: Base de comissionamento = Rebate (o mesmo valor, sem mais nenhuma conta).
+	// Crédito/Virtual: Spread emissão − Custo + Rebate. Spread emissão é texto livre
+	// (Incremento 56) — mas quando o tipo NÃO é Pronto, a validação em OperacaoService já
+	// garante que é sempre um número de verdade (nunca "NA" nesse caso), então o parse
+	// abaixo não deveria falhar na prática; ainda assim tratado defensivamente (retorna
+	// null em vez de propagar exceção pra um GET /operacoes inteiro).
+	private static BigDecimal calcularBaseComissionamento(String prCrVir, String spreadEmissao, BigDecimal custo,
+			BigDecimal rebate) {
+		if (rebate == null) {
+			return null;
+		}
+		if ("Pronto".equalsIgnoreCase(prCrVir)) {
+			return rebate;
+		}
+		BigDecimal spreadEmissaoValor;
+		try {
+			spreadEmissaoValor = new BigDecimal(spreadEmissao);
+		} catch (NumberFormatException | NullPointerException e) {
+			return null;
+		}
+		return spreadEmissaoValor.subtract(custo).add(rebate).setScale(ESCALA_SPREAD, RoundingMode.HALF_UP);
 	}
 
 }

@@ -14,7 +14,7 @@ class OperacaoCalculoTests {
 		// valorME=1000, nivelamento=5,10, taxaFinal=5,00, venda, fórmula do banco = 50%
 		ValoresCalculados valores = OperacaoCalculo.calcular(
 				new BigDecimal("1000"), new BigDecimal("5.05"), new BigDecimal("5.10"), new BigDecimal("5.00"), "V",
-				"Pronto", "N*50%", BigDecimal.ZERO);
+				"Pronto", "NA", "N*50%", BigDecimal.ZERO);
 
 		assertEquals(new BigDecimal("5000.00"), valores.reais());
 		assertEquals(new BigDecimal("100.00"), valores.totalBrutoCambio());
@@ -31,7 +31,7 @@ class OperacaoCalculoTests {
 		// compra: a casa ganha a diferença ao contrário (taxaFinal - nivelamento)
 		ValoresCalculados valores = OperacaoCalculo.calcular(
 				new BigDecimal("1000"), new BigDecimal("5.05"), new BigDecimal("5.00"), new BigDecimal("5.10"), "C",
-				"Pronto", "N*50%", BigDecimal.ZERO);
+				"Pronto", "NA", "N*50%", BigDecimal.ZERO);
 
 		assertEquals(new BigDecimal("5100.00"), valores.reais());
 		assertEquals(new BigDecimal("100.00"), valores.totalBrutoCambio());
@@ -46,7 +46,7 @@ class OperacaoCalculoTests {
 	void cvDesconhecidoNaoCalculaTotalBrutoNemComissaoMasCalculaReaisEValorAbsoluto() {
 		ValoresCalculados valores = OperacaoCalculo.calcular(
 				new BigDecimal("1000"), new BigDecimal("5.05"), new BigDecimal("5.10"), new BigDecimal("5.00"), "XPTO",
-				"Pronto", "N*50%", BigDecimal.ZERO);
+				"Pronto", "NA", "N*50%", BigDecimal.ZERO);
 
 		assertEquals(new BigDecimal("5000.00"), valores.reais());
 		assertNull(valores.totalBrutoCambio());
@@ -63,7 +63,7 @@ class OperacaoCalculoTests {
 	void cvNaoDisponivelCalculaSpreadLiquidacaoComoSeFosseCompra() {
 		ValoresCalculados valores = OperacaoCalculo.calcular(
 				new BigDecimal("1000"), new BigDecimal("5.05"), new BigDecimal("5.10"), new BigDecimal("5.00"), "NA",
-				"Pronto", "N*50%", BigDecimal.ZERO);
+				"Pronto", "NA", "N*50%", BigDecimal.ZERO);
 
 		assertNull(valores.totalBrutoCambio());
 		assertNull(valores.comissaoLiquida());
@@ -75,7 +75,7 @@ class OperacaoCalculoTests {
 	void semFormulaDoBancoNaoCalculaComissaoMasCalculaOResto() {
 		ValoresCalculados valores = OperacaoCalculo.calcular(
 				new BigDecimal("1000"), new BigDecimal("5.05"), new BigDecimal("5.10"), new BigDecimal("5.00"), "V",
-				"Pronto", null, null);
+				"Pronto", "NA", null, null);
 
 		assertEquals(new BigDecimal("5000.00"), valores.reais());
 		assertEquals(new BigDecimal("100.00"), valores.totalBrutoCambio());
@@ -90,7 +90,7 @@ class OperacaoCalculoTests {
 		// Fórmula real informada pelo usuário: =N*70%-N*70%*4,65%
 		ValoresCalculados valores = OperacaoCalculo.calcular(
 				new BigDecimal("885242.40"), new BigDecimal("5.1990"), new BigDecimal("5.1960"),
-				new BigDecimal("5.1856"), "V", "Pronto", "N*70%-N*70%*4,65%", BigDecimal.ZERO);
+				new BigDecimal("5.1856"), "V", "Pronto", "NA", "N*70%-N*70%*4,65%", BigDecimal.ZERO);
 
 		assertEquals(new BigDecimal("4590512.99"), valores.reais());
 		assertEquals(new BigDecimal("9206.52"), valores.totalBrutoCambio());
@@ -106,7 +106,7 @@ class OperacaoCalculoTests {
 		// Fórmula real informada pelo usuário: =N*70% (sem desconto)
 		ValoresCalculados valores = OperacaoCalculo.calcular(
 				new BigDecimal("2349.78"), new BigDecimal("5.2200"), new BigDecimal("5.2154"),
-				new BigDecimal("5.2206"), "C", "Pronto", "N*70%", BigDecimal.ZERO);
+				new BigDecimal("5.2206"), "C", "Pronto", "NA", "N*70%", BigDecimal.ZERO);
 
 		assertEquals(new BigDecimal("12267.26"), valores.reais());
 		assertEquals(new BigDecimal("12.22"), valores.totalBrutoCambio());
@@ -123,7 +123,7 @@ class OperacaoCalculoTests {
 		// Custo = Spot Asset / Taxa Final − 1, só quando o tipo da ordem é "Crédito"
 		ValoresCalculados valores = OperacaoCalculo.calcular(
 				new BigDecimal("1000"), new BigDecimal("5.10"), new BigDecimal("5.00"), new BigDecimal("5.00"), "V",
-				"Credito", "N*50%", BigDecimal.ZERO);
+				"Credito", "0.015", "N*50%", BigDecimal.ZERO);
 
 		// 5,10 / 5,00 − 1 = 0,020
 		assertEquals(new BigDecimal("0.020"), valores.custo());
@@ -133,7 +133,7 @@ class OperacaoCalculoTests {
 	void prontoNaoCalculaCusto() {
 		ValoresCalculados valores = OperacaoCalculo.calcular(
 				new BigDecimal("1000"), new BigDecimal("5.10"), new BigDecimal("5.00"), new BigDecimal("5.00"), "V",
-				"Pronto", "N*50%", BigDecimal.ZERO);
+				"Pronto", "NA", "N*50%", BigDecimal.ZERO);
 
 		assertEquals(new BigDecimal("0.000"), valores.custo());
 	}
@@ -144,7 +144,7 @@ class OperacaoCalculoTests {
 		// cai no "senão = 0", não só Pronto.
 		ValoresCalculados valores = OperacaoCalculo.calcular(
 				new BigDecimal("1000"), new BigDecimal("5.10"), new BigDecimal("5.00"), new BigDecimal("5.00"), "V",
-				"Virtual", "N*50%", BigDecimal.ZERO);
+				"Virtual", "0.015", "N*50%", BigDecimal.ZERO);
 
 		assertEquals(new BigDecimal("0.000"), valores.custo());
 	}
@@ -158,7 +158,7 @@ class OperacaoCalculoTests {
 		// rebate = 0,020 × 70 = 1,400
 		ValoresCalculados valores = OperacaoCalculo.calcular(
 				new BigDecimal("1000"), new BigDecimal("5.05"), new BigDecimal("5.10"), new BigDecimal("5.00"), "V",
-				"Pronto", "N*50%", new BigDecimal("70"));
+				"Pronto", "NA", "N*50%", new BigDecimal("70"));
 
 		assertEquals(new BigDecimal("0.020"), valores.spreadLiquidacao());
 		assertEquals(new BigDecimal("1.400"), valores.rebate());
@@ -170,7 +170,7 @@ class OperacaoCalculoTests {
 		// mesma fórmula de Pronto — Virtual reaproveita a Spread liquidação, igual Pronto.
 		ValoresCalculados valores = OperacaoCalculo.calcular(
 				new BigDecimal("1000"), new BigDecimal("5.05"), new BigDecimal("5.00"), new BigDecimal("5.10"), "C",
-				"Virtual", "N*50%", new BigDecimal("70"));
+				"Virtual", "0.015", "N*50%", new BigDecimal("70"));
 
 		assertEquals(new BigDecimal("0.020"), valores.spreadLiquidacao());
 		assertEquals(new BigDecimal("1.400"), valores.rebate());
@@ -185,7 +185,7 @@ class OperacaoCalculoTests {
 	void creditoCalculaRebateComFormulaFixaIndependenteDoCV() {
 		ValoresCalculados valores = OperacaoCalculo.calcular(
 				new BigDecimal("1000"), new BigDecimal("5.05"), new BigDecimal("5.10"), new BigDecimal("5.00"), "C",
-				"Credito", "N*50%", new BigDecimal("70"));
+				"Credito", "0.015", "N*50%", new BigDecimal("70"));
 
 		// a Spread liquidação (pra C/V) dá negativo — confirma que o Rebate NÃO reaproveita
 		assertEquals(new BigDecimal("-0.020"), valores.spreadLiquidacao());
@@ -197,9 +197,60 @@ class OperacaoCalculoTests {
 	void taxaDeRebateNulaNaoCalculaRebate() {
 		ValoresCalculados valores = OperacaoCalculo.calcular(
 				new BigDecimal("1000"), new BigDecimal("5.05"), new BigDecimal("5.10"), new BigDecimal("5.00"), "V",
-				"Pronto", null, null);
+				"Pronto", "NA", null, null);
 
 		assertNull(valores.rebate());
+	}
+
+	// --- Achado de negócio (Incremento 65): campo Base de comissionamento ---
+
+	@Test
+	void prontoBaseDeComissionamentoEhIgualAoRebate() {
+		ValoresCalculados valores = OperacaoCalculo.calcular(
+				new BigDecimal("1000"), new BigDecimal("5.05"), new BigDecimal("5.10"), new BigDecimal("5.00"), "V",
+				"Pronto", "NA", "N*50%", new BigDecimal("70"));
+
+		assertEquals(new BigDecimal("1.400"), valores.rebate());
+		assertEquals(valores.rebate(), valores.baseComissionamento());
+	}
+
+	// Crédito: Base de comissionamento = Spread emissão − Custo + Rebate.
+	@Test
+	void creditoBaseDeComissionamentoUsaSpreadEmissaoMenosCustoMaisRebate() {
+		ValoresCalculados valores = OperacaoCalculo.calcular(
+				new BigDecimal("1000"), new BigDecimal("5.10"), new BigDecimal("5.10"), new BigDecimal("5.00"), "V",
+				"Credito", "0.050", "N*50%", new BigDecimal("70"));
+
+		// custo = Spot Asset / Taxa Final − 1 = 5,10 / 5,00 − 1 = 0,020
+		assertEquals(new BigDecimal("0.020"), valores.custo());
+		// rebate (fórmula fixa de Crédito) = Nivelamento/Taxa Final − 1 × 70 = 0,020 × 70 = 1,400
+		assertEquals(new BigDecimal("1.400"), valores.rebate());
+		// base = 0,050 − 0,020 + 1,400 = 1,430
+		assertEquals(new BigDecimal("1.430"), valores.baseComissionamento());
+	}
+
+	// Virtual: mesma fórmula de Crédito (Spread emissão − Custo + Rebate), mas Custo é
+	// sempre 0 pra Virtual (regra do Incremento 57) — na prática vira Spread emissão + Rebate.
+	@Test
+	void virtualBaseDeComissionamentoUsaSpreadEmissaoMaisRebateJaQueCustoEhZero() {
+		ValoresCalculados valores = OperacaoCalculo.calcular(
+				new BigDecimal("1000"), new BigDecimal("5.10"), new BigDecimal("5.10"), new BigDecimal("5.00"), "V",
+				"Virtual", "0.050", "N*50%", new BigDecimal("70"));
+
+		assertEquals(new BigDecimal("0.000"), valores.custo());
+		assertEquals(new BigDecimal("1.400"), valores.rebate());
+		// base = 0,050 − 0,000 + 1,400 = 1,450
+		assertEquals(new BigDecimal("1.450"), valores.baseComissionamento());
+	}
+
+	@Test
+	void semRebateNaoCalculaBaseDeComissionamento() {
+		ValoresCalculados valores = OperacaoCalculo.calcular(
+				new BigDecimal("1000"), new BigDecimal("5.05"), new BigDecimal("5.10"), new BigDecimal("5.00"), "V",
+				"Pronto", "NA", null, null);
+
+		assertNull(valores.rebate());
+		assertNull(valores.baseComissionamento());
 	}
 
 }

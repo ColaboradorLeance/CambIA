@@ -356,6 +356,7 @@ export default function OperacoesPage() {
 						<th>Spread liquidação</th>
 						<th>Custo</th>
 						<th>Rebate</th>
+						<th>Base de comissionamento</th>
 						<th>Comissão</th>
 						<th>Criado por</th>
 						<th>Completado por</th>
@@ -386,6 +387,7 @@ export default function OperacoesPage() {
 							<td className="mono">{formatarPercentual(op.spreadLiquidacao)}</td>
 							<td className="mono">{formatarPercentual(op.custo)}</td>
 							<td className="mono">{formatarMoeda(op.rebate)}</td>
+							<td className="mono">{formatarMoeda(op.baseComissionamento)}</td>
 							<td className="mono">{formatarMoeda(op.comissaoLiquida)}</td>
 							<td>{op.criadoPorNome || "—"}</td>
 							<td>{op.completadoPorNome || "—"}</td>

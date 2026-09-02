@@ -169,8 +169,9 @@ class OperacaoService {
 		String bancoNome = nomeBanco(operacao.getBancoId());
 
 		if (operacao.getStatus() != StatusOperacao.CONFIRMADO) {
-			return OperacaoResponse.from(operacao, new ValoresCalculados(null, null, null, null, null, null, null),
-					criadoPorNome, completadoPorNome, clienteNome, clienteDocumento, bancoNome);
+			return OperacaoResponse.from(operacao,
+					new ValoresCalculados(null, null, null, null, null, null, null, null), criadoPorNome,
+					completadoPorNome, clienteNome, clienteDocumento, bancoNome);
 		}
 		String formulaComissao = bancoRepository.findCalculoFormulaById(operacao.getBancoId())
 				.orElse(null);
@@ -178,7 +179,7 @@ class OperacaoService {
 				.orElse(null);
 		ValoresCalculados valores = OperacaoCalculo.calcular(operacao.getValorMe(), operacao.getSpotAsset(),
 				operacao.getNivelamento(), operacao.getTaxaFinal(), operacao.getCv(), operacao.getPrCrVir(),
-				formulaComissao, taxaRebate);
+				operacao.getSpreadEmissao(), formulaComissao, taxaRebate);
 		return OperacaoResponse.from(operacao, valores, criadoPorNome, completadoPorNome, clienteNome,
 				clienteDocumento, bancoNome);
 	}
