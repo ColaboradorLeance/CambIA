@@ -61,17 +61,22 @@ export default function ListagemOrdensPage() {
 
 	const confirmadas = operacoes.filter((op) => op.status === "CONFIRMADO");
 
+	// Moeda não tem domínio fechado no sistema (suporta qualquer ISO 4217, cadastro
+	// futuro — ver docs/dominio.md) — por isso as opções do <select> vêm das moedas que
+	// realmente aparecem nas ordens já confirmadas, e não de uma lista fixa.
+	const moedasDisponiveis = [...new Set(confirmadas.map((op) => op.moeda).filter(Boolean))].sort();
+
 	const filtradas = confirmadas.filter((op) => {
 		if (filtros.dataFechamento && dataLocalIso(op.completadoEm) !== filtros.dataFechamento) return false;
-		if (!contemTexto(op.moeda, filtros.moeda)) return false;
+		if (filtros.moeda && op.moeda !== filtros.moeda) return false;
 		if (filtros.valorMoeda && !formatarMoeda(op.valorMe).includes(filtros.valorMoeda)) return false;
 		if (!contemTexto(op.clienteDocumento, filtros.cnpj)) return false;
 		if (!contemTexto(op.clienteNome, filtros.nome)) return false;
 		if (!contemTexto(op.idTrade, filtros.idTrade)) return false;
-		if (!contemTexto(op.cv, filtros.cv)) return false;
-		if (!contemTexto(op.prCrVir, filtros.tipo)) return false;
+		if (filtros.cv && op.cv !== filtros.cv) return false;
+		if (filtros.tipo && (op.prCrVir || "").toLowerCase() !== filtros.tipo.toLowerCase()) return false;
 		if (!contemTexto(op.bancoNome, filtros.banco)) return false;
-		if (!contemTexto(calcularFundo(op.prCrVir), filtros.fundo)) return false;
+		if (filtros.fundo && calcularFundo(op.prCrVir) !== filtros.fundo) return false;
 		if (!contemTexto(op.criadoPorNome, filtros.criadoPor)) return false;
 		if (!contemTexto(op.completadoPorNome, filtros.completadoPor)) return false;
 		return true;
@@ -95,11 +100,14 @@ export default function ListagemOrdensPage() {
 				</label>
 				<label>
 					Moeda
-					<input
-						value={filtros.moeda}
-						onChange={(e) => atualizarFiltro("moeda", e.target.value)}
-						placeholder="Todas"
-					/>
+					<select value={filtros.moeda} onChange={(e) => atualizarFiltro("moeda", e.target.value)}>
+						<option value="">Todas</option>
+						{moedasDisponiveis.map((moeda) => (
+							<option key={moeda} value={moeda}>
+								{moeda}
+							</option>
+						))}
+					</select>
 				</label>
 				<label>
 					Valor Moeda
@@ -135,19 +143,21 @@ export default function ListagemOrdensPage() {
 				</label>
 				<label>
 					C/V
-					<input
-						value={filtros.cv}
-						onChange={(e) => atualizarFiltro("cv", e.target.value)}
-						placeholder="Todos"
-					/>
+					<select value={filtros.cv} onChange={(e) => atualizarFiltro("cv", e.target.value)}>
+						<option value="">Todos</option>
+						<option value="C">C (Compra)</option>
+						<option value="V">V (Venda)</option>
+						<option value="NA">NA</option>
+					</select>
 				</label>
 				<label>
 					Tipo
-					<input
-						value={filtros.tipo}
-						onChange={(e) => atualizarFiltro("tipo", e.target.value)}
-						placeholder="Todos"
-					/>
+					<select value={filtros.tipo} onChange={(e) => atualizarFiltro("tipo", e.target.value)}>
+						<option value="">Todos</option>
+						<option value="Pronto">Pronto</option>
+						<option value="Credito">Crédito</option>
+						<option value="Virtual">Virtual</option>
+					</select>
 				</label>
 				<label>
 					Banco
@@ -159,11 +169,11 @@ export default function ListagemOrdensPage() {
 				</label>
 				<label>
 					Fundo
-					<input
-						value={filtros.fundo}
-						onChange={(e) => atualizarFiltro("fundo", e.target.value)}
-						placeholder="Todos"
-					/>
+					<select value={filtros.fundo} onChange={(e) => atualizarFiltro("fundo", e.target.value)}>
+						<option value="">Todos</option>
+						<option value="P">P</option>
+						<option value="M">M</option>
+					</select>
 				</label>
 				<label>
 					Criado por
