@@ -32,6 +32,13 @@ const FILTROS_VAZIOS = {
 	valorMoeda: "",
 	cnpj: "",
 	nome: "",
+	idTrade: "",
+	cv: "",
+	tipo: "",
+	banco: "",
+	fundo: "",
+	criadoPor: "",
+	completadoPor: "",
 };
 
 function contemTexto(valor, filtro) {
@@ -153,12 +160,24 @@ export default function OperacoesPage() {
 
 	const emAndamento = operacoes.filter((op) => op.status === "ANDAMENTO");
 
+	// Moeda não tem domínio fechado no sistema (suporta qualquer ISO 4217) — as opções
+	// do <select> vêm das moedas que já aparecem nas ordens em andamento carregadas,
+	// mesmo critério usado na aba Confirmadas (Incremento 68).
+	const moedasDisponiveis = [...new Set(emAndamento.map((op) => op.moeda).filter(Boolean))].sort();
+
 	const filtradas = emAndamento.filter((op) => {
 		if (filtros.data && op.data !== filtros.data) return false;
-		if (!contemTexto(op.moeda, filtros.moeda)) return false;
+		if (filtros.moeda && op.moeda !== filtros.moeda) return false;
 		if (filtros.valorMoeda && !formatarMoeda(op.valorMe).includes(filtros.valorMoeda)) return false;
 		if (!contemTexto(op.clienteDocumento, filtros.cnpj)) return false;
 		if (!contemTexto(op.clienteNome, filtros.nome)) return false;
+		if (!contemTexto(op.idTrade, filtros.idTrade)) return false;
+		if (filtros.cv && op.cv !== filtros.cv) return false;
+		if (filtros.tipo && (op.prCrVir || "").toLowerCase() !== filtros.tipo.toLowerCase()) return false;
+		if (!contemTexto(op.bancoNome, filtros.banco)) return false;
+		if (filtros.fundo && calcularFundo(op.prCrVir) !== filtros.fundo) return false;
+		if (!contemTexto(op.criadoPorNome, filtros.criadoPor)) return false;
+		if (!contemTexto(op.completadoPorNome, filtros.completadoPor)) return false;
 		return true;
 	});
 
@@ -284,11 +303,14 @@ export default function OperacoesPage() {
 				</label>
 				<label>
 					Moeda
-					<input
-						value={filtros.moeda}
-						onChange={(e) => atualizarFiltro("moeda", e.target.value)}
-						placeholder="Todas"
-					/>
+					<select value={filtros.moeda} onChange={(e) => atualizarFiltro("moeda", e.target.value)}>
+						<option value="">Todas</option>
+						{moedasDisponiveis.map((moeda) => (
+							<option key={moeda} value={moeda}>
+								{moeda}
+							</option>
+						))}
+					</select>
 				</label>
 				<label>
 					Valor Moeda
@@ -311,6 +333,64 @@ export default function OperacoesPage() {
 					<input
 						value={filtros.nome}
 						onChange={(e) => atualizarFiltro("nome", e.target.value)}
+						placeholder="Todos"
+					/>
+				</label>
+				<label>
+					ID do trade
+					<input
+						value={filtros.idTrade}
+						onChange={(e) => atualizarFiltro("idTrade", e.target.value)}
+						placeholder="Todos"
+					/>
+				</label>
+				<label>
+					C/V
+					<select value={filtros.cv} onChange={(e) => atualizarFiltro("cv", e.target.value)}>
+						<option value="">Todos</option>
+						<option value="C">C (Compra)</option>
+						<option value="V">V (Venda)</option>
+						<option value="NA">NA</option>
+					</select>
+				</label>
+				<label>
+					Tipo
+					<select value={filtros.tipo} onChange={(e) => atualizarFiltro("tipo", e.target.value)}>
+						<option value="">Todos</option>
+						<option value="Pronto">Pronto</option>
+						<option value="Credito">Crédito</option>
+						<option value="Virtual">Virtual</option>
+					</select>
+				</label>
+				<label>
+					Banco
+					<input
+						value={filtros.banco}
+						onChange={(e) => atualizarFiltro("banco", e.target.value)}
+						placeholder="Todos"
+					/>
+				</label>
+				<label>
+					Fundo
+					<select value={filtros.fundo} onChange={(e) => atualizarFiltro("fundo", e.target.value)}>
+						<option value="">Todos</option>
+						<option value="P">P</option>
+						<option value="M">M</option>
+					</select>
+				</label>
+				<label>
+					Criado por
+					<input
+						value={filtros.criadoPor}
+						onChange={(e) => atualizarFiltro("criadoPor", e.target.value)}
+						placeholder="Todos"
+					/>
+				</label>
+				<label>
+					Completado por
+					<input
+						value={filtros.completadoPor}
+						onChange={(e) => atualizarFiltro("completadoPor", e.target.value)}
 						placeholder="Todos"
 					/>
 				</label>
