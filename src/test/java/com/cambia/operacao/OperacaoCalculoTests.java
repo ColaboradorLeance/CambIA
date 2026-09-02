@@ -149,4 +149,57 @@ class OperacaoCalculoTests {
 		assertEquals(new BigDecimal("0.000"), valores.custo());
 	}
 
+	// --- Achado de negócio (Incremento 64): campo Rebate ---
+
+	@Test
+	void prontoCalculaRebateComSpreadLiquidacaoVezesTaxaDeRebate() {
+		// venda: spread liquidação = Nivelamento / Taxa Final − 1 = 5,10 / 5,00 − 1 = 0,020
+		// taxa de rebate crua (sem dividir por 100, confirmado pelo usuário): 70
+		// rebate = 0,020 × 70 = 1,400
+		ValoresCalculados valores = OperacaoCalculo.calcular(
+				new BigDecimal("1000"), new BigDecimal("5.05"), new BigDecimal("5.10"), new BigDecimal("5.00"), "V",
+				"Pronto", "N*50%", new BigDecimal("70"));
+
+		assertEquals(new BigDecimal("0.020"), valores.spreadLiquidacao());
+		assertEquals(new BigDecimal("1.400"), valores.rebate());
+	}
+
+	@Test
+	void virtualCalculaRebateComSpreadLiquidacaoVezesTaxaDeRebate() {
+		// compra: spread liquidação = Taxa Final / Nivelamento − 1 = 5,10 / 5,00 − 1 = 0,020
+		// mesma fórmula de Pronto — Virtual reaproveita a Spread liquidação, igual Pronto.
+		ValoresCalculados valores = OperacaoCalculo.calcular(
+				new BigDecimal("1000"), new BigDecimal("5.05"), new BigDecimal("5.00"), new BigDecimal("5.10"), "C",
+				"Virtual", "N*50%", new BigDecimal("70"));
+
+		assertEquals(new BigDecimal("0.020"), valores.spreadLiquidacao());
+		assertEquals(new BigDecimal("1.400"), valores.rebate());
+	}
+
+	// Achado de negócio: Crédito usa uma fórmula PRÓPRIA e FIXA (Nivelamento/Taxa Final − 1),
+	// independente do C/V da operação — confirmado explicitamente pelo usuário. Este teste
+	// prova a independência: cv="C" faria a Spread liquidação dar −0,020 (Taxa Final /
+	// Nivelamento − 1 = 5,00/5,10−1), mas o Rebate de Crédito ignora isso e usa
+	// Nivelamento/Taxa Final − 1 = +0,020 de qualquer jeito.
+	@Test
+	void creditoCalculaRebateComFormulaFixaIndependenteDoCV() {
+		ValoresCalculados valores = OperacaoCalculo.calcular(
+				new BigDecimal("1000"), new BigDecimal("5.05"), new BigDecimal("5.10"), new BigDecimal("5.00"), "C",
+				"Credito", "N*50%", new BigDecimal("70"));
+
+		// a Spread liquidação (pra C/V) dá negativo — confirma que o Rebate NÃO reaproveita
+		assertEquals(new BigDecimal("-0.020"), valores.spreadLiquidacao());
+		// mas o Rebate de Crédito usa a fórmula fixa: 5,10/5,00−1 = 0,020; × 70 = 1,400
+		assertEquals(new BigDecimal("1.400"), valores.rebate());
+	}
+
+	@Test
+	void taxaDeRebateNulaNaoCalculaRebate() {
+		ValoresCalculados valores = OperacaoCalculo.calcular(
+				new BigDecimal("1000"), new BigDecimal("5.05"), new BigDecimal("5.10"), new BigDecimal("5.00"), "V",
+				"Pronto", null, null);
+
+		assertNull(valores.rebate());
+	}
+
 }

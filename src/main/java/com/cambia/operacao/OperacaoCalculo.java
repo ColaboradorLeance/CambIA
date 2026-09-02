@@ -27,17 +27,19 @@ class OperacaoCalculo {
 				.setScale(ESCALA, RoundingMode.HALF_UP);
 		BigDecimal spreadLiquidacao = calcularSpreadLiquidacao(nivelamento, taxaFinal, cv);
 		BigDecimal custo = calcularCusto(spotAsset, taxaFinal, prCrVir);
+		BigDecimal rebate = calcularRebate(nivelamento, taxaFinal, spreadLiquidacao, prCrVir, taxaRebateBanco);
 
 		BigDecimal totalBrutoCambio = calcularTotalBrutoCambio(valorMe, nivelamento, taxaFinal, cv);
 		if (totalBrutoCambio == null) {
-			return new ValoresCalculados(reais, null, null, valorAbsoluto, spreadLiquidacao, custo);
+			return new ValoresCalculados(reais, null, null, valorAbsoluto, spreadLiquidacao, custo, rebate);
 		}
 
 		BigDecimal comissaoLiquida = formulaComissaoBanco == null ? null
 				: new FormulaComissao(formulaComissaoBanco).avaliar(totalBrutoCambio, taxaRebateBanco)
 						.setScale(ESCALA, RoundingMode.HALF_UP);
 
-		return new ValoresCalculados(reais, totalBrutoCambio, comissaoLiquida, valorAbsoluto, spreadLiquidacao, custo);
+		return new ValoresCalculados(reais, totalBrutoCambio, comissaoLiquida, valorAbsoluto, spreadLiquidacao, custo,
+				rebate);
 	}
 
 	private static BigDecimal calcularTotalBrutoCambio(BigDecimal valorMe, BigDecimal nivelamento,
@@ -76,6 +78,30 @@ class OperacaoCalculo {
 			return spotAsset.divide(taxaFinal, ESCALA_SPREAD, RoundingMode.HALF_UP).subtract(BigDecimal.ONE);
 		}
 		return BigDecimal.ZERO.setScale(ESCALA_SPREAD, RoundingMode.HALF_UP);
+	}
+
+	// Achado de negócio (Incremento 64): fórmula confirmada pelo usuário — base de
+	// comissionamento pro rebate. Pronto e Virtual reaproveitam o valor que Spread
+	// liquidação já calculou pra essa operação (que já varia sozinho conforme C/V,
+	// internamente); Crédito usa uma fórmula PRÓPRIA e FIXA (Nivelamento/Taxa Final − 1,
+	// forma "venda" do spread), independente do C/V da operação — confirmado
+	// explicitamente pelo usuário, não é o mesmo caminho que Pronto/Virtual tomam.
+	// Taxa de rebate usada crua (sem dividir por 100 — também confirmado pelo usuário),
+	// mesmo padrão de escala (3 casas, HALF_UP) dos outros campos desta família.
+	private static BigDecimal calcularRebate(BigDecimal nivelamento, BigDecimal taxaFinal, BigDecimal spreadLiquidacao,
+			String prCrVir, BigDecimal taxaRebateBanco) {
+		if (taxaRebateBanco == null) {
+			return null;
+		}
+		if ("Credito".equalsIgnoreCase(prCrVir)) {
+			BigDecimal base = nivelamento.divide(taxaFinal, ESCALA_SPREAD, RoundingMode.HALF_UP).subtract(BigDecimal.ONE);
+			return base.multiply(taxaRebateBanco).setScale(ESCALA_SPREAD, RoundingMode.HALF_UP);
+		}
+		if ("Pronto".equalsIgnoreCase(prCrVir) || "Virtual".equalsIgnoreCase(prCrVir)) {
+			return spreadLiquidacao == null ? null
+					: spreadLiquidacao.multiply(taxaRebateBanco).setScale(ESCALA_SPREAD, RoundingMode.HALF_UP);
+		}
+		return null;
 	}
 
 }

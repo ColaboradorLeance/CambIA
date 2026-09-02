@@ -169,7 +169,7 @@ class OperacaoService {
 		String bancoNome = nomeBanco(operacao.getBancoId());
 
 		if (operacao.getStatus() != StatusOperacao.CONFIRMADO) {
-			return OperacaoResponse.from(operacao, new ValoresCalculados(null, null, null, null, null, null),
+			return OperacaoResponse.from(operacao, new ValoresCalculados(null, null, null, null, null, null, null),
 					criadoPorNome, completadoPorNome, clienteNome, clienteDocumento, bancoNome);
 		}
 		String formulaComissao = bancoRepository.findCalculoFormulaById(operacao.getBancoId())
