@@ -6,11 +6,10 @@ código-fonte. Este documento descreve como cortar uma nova versão.
 
 ## Esquema de versão
 
-Uma única versão (SemVer, `MAJOR.MINOR.PATCH`) para o sistema como um todo — backend,
-front-end e reverse-proxy sempre saem juntos com o mesmo número, mesmo que só um dos três
-tenha mudado. A versão atual vive no arquivo [`VERSION`](VERSION), na raiz do repositório,
-e é replicada em `pom.xml` (`<version>`) e `frontend/package.json` (`"version"`) a cada
-release — essas três fontes nunca devem divergir entre releases.
+Uma única versão (SemVer, `MAJOR.MINOR.PATCH`) para o sistema como um todo. A versão
+atual vive no arquivo [`VERSION`](VERSION), na raiz do repositório, e é replicada em
+`pom.xml` (`<version>`) e `frontend/package.json` (`"version"`) a cada release — essas
+três fontes nunca devem divergir entre releases.
 
 Convenção de incremento:
 
@@ -23,21 +22,39 @@ Convenção de incremento:
   cliente precisa agir (ex: variável de ambiente obrigatória nova, migração de dados que
   exige passo manual, remoção de um endpoint que uma integração externa possa usar).
 
-## Onde as imagens são publicadas
+## Uma imagem só, com tudo dentro (menos o banco)
+
+Backend (Java), front-end (React) e reverse-proxy HTTPS (nginx) são publicados como
+**uma única imagem** — `docker/Dockerfile` builda os três e monta um único container
+que roda o processo Java e o nginx lado a lado (nginx serve a SPA direto e faz proxy só
+das rotas de API pro backend, que escuta em loopback dentro do próprio container; o
+backend reinicia sozinho se cair, ex: banco ainda não pronto na subida — ver
+`docker/entrypoint.sh` pros detalhes). Simplifica a entrega: um comando de
+`docker pull`, um `docker run`/serviço de compose, um log só pra acompanhar.
+
+`db` (Postgres) continua **sempre separado** — nunca entra nesta imagem. Colocar um
+banco de dados com estado dentro da mesma imagem da aplicação foi considerado e
+descartado: arriscaria perda de dados ao recriar o container, impediria backup/restore
+independente, e quebraria a opção de banco de dados externo que o cliente pode usar
+(ver README.md). `mailpit` também fica de fora — é só uma ferramenta de teste local.
+
+> O `docker-compose.yml` da raiz deste repositório (usado em desenvolvimento — ver
+> [DEVELOPMENT.md](DEVELOPMENT.md)) continua buildando backend/frontend/reverse-proxy
+> como 3 imagens separadas, propositalmente — é mais rápido pra iterar localmente
+> (rebuild só do serviço que mudou) e não precisa da complexidade de rodar dois
+> processos num container só. A imagem única é gerada só na hora do release, a partir
+> de `docker/Dockerfile`.
+
+## Onde a imagem é publicada
 
 [GitHub Container Registry](https://ghcr.io) (`ghcr.io`), **privado**, na conta
 `ColaboradorLeance` (a mesma usada para dar push no repositório):
 
-- `ghcr.io/colaboradorleance/cambia-backend`
-- `ghcr.io/colaboradorleance/cambia-frontend`
-- `ghcr.io/colaboradorleance/cambia-reverse-proxy`
+- `ghcr.io/colaboradorleance/cambia`
 
-`db` (Postgres) e `mailpit` não entram nesse processo — são imagens de terceiros, puxadas
-direto do Docker Hub pelo próprio `docker-compose.yml` do cliente.
-
-Cada imagem é publicada com duas tags: a versão exata (`:1.1.0`) e `:latest` (sempre
-aponta pra última publicada). Para uma entrega a um cliente específico, usar sempre a tag
-de versão exata — nunca `:latest` — pra saber exatamente o que está rodando em cada lugar.
+Publicada com duas tags: a versão exata (`:1.1.0`) e `:latest` (sempre aponta pra
+última publicada). Para uma entrega a um cliente específico, usar sempre a tag de
+versão exata — nunca `:latest` — pra saber exatamente o que está rodando em cada lugar.
 
 ## Como cortar uma release
 
@@ -51,9 +68,9 @@ O script (ver [`scripts/release.sh`](scripts/release.sh) para o passo a passo co
 2. Commita essa mudança e cria a tag git `v1.1.0`.
 3. Publica o commit e a tag no GitHub (`origin master` + a tag).
 4. Roda a suíte de testes do backend — aborta a release se algum teste falhar.
-5. Builda as 3 imagens (`docker compose build --no-cache`, garantindo que refletem
-   exatamente o código commitado, sem cache de uma build antiga).
-6. Publica cada imagem no GHCR com as tags `:1.1.0` e `:latest`.
+5. Builda a imagem única (`docker build -f docker/Dockerfile --no-cache`, garantindo
+   que reflete exatamente o código commitado, sem cache de uma build antiga).
+6. Publica a imagem no GHCR com as tags `:1.1.0` e `:latest`.
 
 Rodar `./scripts/release.sh` **sem argumento** republica a versão já gravada em
 `VERSION` (sem bump) — útil pra tentar de novo depois de uma falha de build/push no meio
@@ -72,9 +89,9 @@ gh auth refresh -h github.com -s write:packages -u ColaboradorLeance
 
 ## Antes de entregar ao cliente
 
-As imagens são **privadas** — o cliente precisa de credenciais próprias para
-`docker pull`, senão toma 401/denied mesmo tendo o nome certo da imagem. Depois da
-primeira publicação, configurar o acesso do cliente ao pacote:
+A imagem é **privada** — o cliente precisa de credenciais próprias para `docker pull`,
+senão toma 401/denied mesmo tendo o nome certo da imagem. Depois da primeira
+publicação, configurar o acesso do cliente ao pacote:
 [github.com/ColaboradorLeance?tab=packages](https://github.com/ColaboradorLeance?tab=packages)
 → selecionar o pacote → "Package settings" → "Manage Actions access" / convidar o
 usuário/organização do cliente como colaborador com permissão de leitura — ou gerar um

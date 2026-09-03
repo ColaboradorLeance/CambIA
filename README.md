@@ -1,6 +1,6 @@
 # CambIA
 
-Instruções para instalar e rodar o sistema CambIA usando as imagens Docker oficiais.
+Instruções para instalar e rodar o sistema CambIA usando a imagem Docker oficial.
 
 > Este documento é para quem vai **rodar o sistema** (cliente final). Se você é desenvolvedor do CambIA e precisa do código-fonte, veja [DEVELOPMENT.md](DEVELOPMENT.md).
 
@@ -14,25 +14,21 @@ Sistema para registrar e controlar operações de compra e venda de moedas inter
 - **Relatórios**: operações filtradas, comparativo entre períodos, rankings (por cliente, banco, moeda, usuário) e posição em aberto.
 - **Histórico de auditoria**: todo evento de uma operação (criação, edição, confirmação, cancelamento) fica registrado com autor e data/hora.
 
-## Imagens
+## Imagem
 
-O CambIA é composto por **3 imagens próprias**, sempre publicadas juntas com o mesmo número de versão (mais o PostgreSQL, que é a imagem oficial de terceiros, não nossa):
+O CambIA roda como **uma única imagem** — backend, front-end e o HTTPS (reverse-proxy) vêm todos juntos no mesmo container, mais simples de instalar e operar. O único outro container necessário é o banco de dados (PostgreSQL, imagem oficial de terceiros — nunca entra na imagem do CambIA, para não arriscar dados em caso de recriação do container).
 
 | Imagem | Tags disponíveis | Quando usar |
 |---|---|---|
-| `ghcr.io/colaboradorleance/cambia-backend` | `:1.0.0`, `:latest` | `:X.Y.Z` (versão exata, imutável) — **recomendada para produção**, fixa exatamente o que está rodando. `:latest` sempre aponta para a versão mais recente publicada — útil só para testar antes de decidir fixar uma versão. |
-| `ghcr.io/colaboradorleance/cambia-frontend` | `:1.0.0`, `:latest` | mesma lógica acima |
-| `ghcr.io/colaboradorleance/cambia-reverse-proxy` | `:1.0.0`, `:latest` | mesma lógica acima |
+| `ghcr.io/colaboradorleance/cambia` | `:1.0.0`, `:latest` | `:X.Y.Z` (versão exata, imutável) — **recomendada para produção**, fixa exatamente o que está rodando. `:latest` sempre aponta para a versão mais recente publicada — útil só para testar antes de decidir fixar uma versão. |
 
-**Nunca misture tags de versões diferentes entre as três** — elas são desenvolvidas e testadas sempre em conjunto.
-
-**Portas expostas**: `443` (HTTPS, ponto de entrada principal) e `80` (só redireciona para HTTPS). Não existe porta separada para o front-end — front-end, backend e API ficam todos atrás do `reverse-proxy`, na mesma origem.
+**Portas expostas**: `443` (HTTPS, ponto de entrada principal) e `80` (só redireciona para HTTPS). Não existe porta separada para o front-end nem para a API — tudo fica atrás do mesmo HTTPS, na mesma origem.
 
 ## Pré-requisitos
 
 - Docker Engine e Docker Compose plugin instalados (`docker compose version` deve funcionar). No Windows/Mac, o [Docker Desktop](https://www.docker.com/products/docker-desktop/) já traz os dois; em Linux, veja o [guia oficial](https://docs.docker.com/engine/install/).
 - Portas `443` e `80` livres no servidor (e `5432` se for usar o Postgres incluso e quiser acessá-lo de outra máquina — ver "Banco de dados" abaixo).
-- **Token de acesso ao registro de imagens** — solicite a quem entregou o sistema. As imagens são **privadas**, não públicas.
+- **Token de acesso ao registro de imagens** — solicite a quem entregou o sistema. A imagem é **privada**, não pública.
 
 > **Windows (PowerShell)**: os comandos deste guia usam sintaxe de shell Unix (bash). A maioria funciona sem alteração no PowerShell — a única diferença aparece em comandos que quebram linha com `\`: no PowerShell, troque `\` por `` ` `` (crase) no fim da linha, ou junte tudo numa linha só.
 
@@ -70,12 +66,14 @@ services:
       timeout: 5s
       retries: 10
 
-  backend:
-    image: ghcr.io/colaboradorleance/cambia-backend:${CAMBIA_VERSION:-1.0.0}
+  app:
+    image: ghcr.io/colaboradorleance/cambia:${CAMBIA_VERSION:-1.0.0}
     environment:
       SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:postgresql://db:5432/cambia}
       SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-cambia}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-cambia}
+      CERT_CN: ${CERT_CN:-localhost}
+      CAMBIA_CORS_ORIGEM_ADICIONAL: https://${CERT_CN:-localhost}
       CAMBIA_MAIL_HABILITADO: ${CAMBIA_MAIL_HABILITADO:-false}
       CAMBIA_MAIL_REMETENTE: ${CAMBIA_MAIL_REMETENTE:-}
       SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-}
@@ -84,42 +82,28 @@ services:
       SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD:-}
       SPRING_MAIL_SMTP_AUTH: ${SPRING_MAIL_SMTP_AUTH:-true}
       SPRING_MAIL_SMTP_STARTTLS: ${SPRING_MAIL_SMTP_STARTTLS:-true}
-      CAMBIA_CORS_ORIGEM_ADICIONAL: https://${CERT_CN:-localhost}
-    depends_on:
-      db:
-        condition: service_healthy
-
-  frontend:
-    image: ghcr.io/colaboradorleance/cambia-frontend:${CAMBIA_VERSION:-1.0.0}
-    depends_on:
-      - backend
-
-  reverse-proxy:
-    image: ghcr.io/colaboradorleance/cambia-reverse-proxy:${CAMBIA_VERSION:-1.0.0}
-    environment:
-      CERT_CN: ${CERT_CN:-localhost}
     volumes:
-      - reverse_proxy_certs:/etc/nginx/certs
+      - app_certs:/etc/nginx/certs
     ports:
       - "443:8443"
       - "80:8080"
     depends_on:
-      - backend
-      - frontend
+      db:
+        condition: service_healthy
 
 volumes:
   db_data:
-  reverse_proxy_certs:
+  app_certs:
 ```
 
-`backend`, `frontend` e `reverse-proxy` usam `image:` (baixados prontos) — nenhum código-fonte é necessário nesta máquina. `db` usa a imagem oficial do Postgres, baixada direto do Docker Hub.
+`app` usa `image:` (baixada pronta) — nenhum código-fonte é necessário nesta máquina. `db` usa a imagem oficial do Postgres, baixada direto do Docker Hub.
 
 ### 3. Configurar o `.env`
 
 Na mesma pasta, crie um arquivo `.env`:
 
 ```dotenv
-# Versão do sistema a usar — combina com a tag das imagens acima.
+# Versão do sistema a usar — combina com a tag da imagem acima.
 # Ver "Atualizando para uma nova versão" antes de mudar este valor.
 CAMBIA_VERSION=1.0.0
 
@@ -129,7 +113,10 @@ POSTGRES_PASSWORD=
 # Nome/IP do servidor gravado no certificado HTTPS — ver seção própria abaixo.
 CERT_CN=localhost
 
-# Envio do link mágico de login por e-mail — ver "Envio real de e-mail" abaixo.
+# Envio do link mágico de login por e-mail (Microsoft 365 / Exchange Online) — ver
+# "Envio real de e-mail" abaixo. Deixe em branco por enquanto: preencher SPRING_MAIL_HOST
+# aqui SEM configurar o resto direito faz até a checagem de saúde do sistema falhar
+# (tenta autenticar de verdade e não consegue) — só preencha ao seguir aquela seção.
 CAMBIA_MAIL_HABILITADO=false
 CAMBIA_MAIL_REMETENTE=
 SPRING_MAIL_HOST=
@@ -146,7 +133,7 @@ Todos os campos têm um valor padrão que já funciona para testar — a tabela 
 
 **Opção A — Postgres incluso (padrão, mais simples)**: nada a fazer — o serviço `db` do `docker-compose.yml` do passo 2 já cuida disso. Os dados ficam no volume `db_data`, persistindo mesmo que os containers sejam recriados.
 
-**Opção B — usar um Postgres que sua empresa já tem**: remova o serviço `db` inteiro (e a linha `db_data:` de `volumes:`) do `docker-compose.yml`, e troque o `depends_on:` do `backend` por nada (remova essas duas linhas também). No `.env`, adicione:
+**Opção B — usar um Postgres que sua empresa já tem**: remova o serviço `db` inteiro (e a linha `db_data:` de `volumes:`) do `docker-compose.yml`, e troque o `depends_on:` do `app` por nada (remova essas duas linhas também). No `.env`, adicione:
 
 ```dotenv
 SPRING_DATASOURCE_URL=jdbc:postgresql://SEU_HOST:5432/SEU_BANCO
@@ -154,7 +141,7 @@ SPRING_DATASOURCE_USERNAME=seu_usuario
 POSTGRES_PASSWORD=sua_senha
 ```
 
-(sim, `POSTGRES_PASSWORD` continua sendo a variável usada — mesmo sem o serviço `db`, é ela que o `backend` usa como senha do banco de dados.)
+(sim, `POSTGRES_PASSWORD` continua sendo a variável usada — mesmo sem o serviço `db`, é ela que o `app` usa como senha do banco de dados.)
 
 > O usuário do banco precisa poder criar tabelas no schema `public` na primeira subida — é quando o Flyway aplica as migrações automaticamente (ver próxima seção). Depois da primeira subida, esse privilégio pode ser revogado até a próxima atualização de versão que traga uma migração nova.
 
@@ -172,7 +159,7 @@ docker compose up -d
 O primeiro comando baixa as imagens; o segundo sobe tudo, aplica as migrações do banco e inicia a aplicação. Acompanhe os logs até ver `Started CambIaApplication`:
 
 ```bash
-docker compose logs -f backend
+docker compose logs -f app
 ```
 
 ### 7. Verificar
@@ -188,7 +175,7 @@ curl -k https://localhost/actuator/health
 
 ## Proxy reverso e certificado HTTPS — já incluso, nada a configurar
 
-Diferente de sistemas que esperam você colocar um nginx/Traefik/Caddy próprio na frente, **o CambIA já vem com o seu próprio reverse-proxy** — um dos três containers do passo 2. HTTPS liga sozinho, com um certificado autoassinado gerado automaticamente na primeira subida (guardado num volume Docker, não é regerado nas próximas vezes). Não é preciso instalar nem configurar nenhum proxy externo para o sistema funcionar.
+Diferente de sistemas que esperam você colocar um nginx/Traefik/Caddy próprio na frente, **o CambIA já vem com o seu próprio HTTPS embutido**, no mesmo container `app`. Ele liga sozinho, com um certificado autoassinado gerado automaticamente na primeira subida (guardado num volume Docker, não é regerado nas próximas vezes). Não é preciso instalar nem configurar nenhum proxy externo para o sistema funcionar.
 
 ### `CERT_CN` — o nome/IP do servidor gravado no certificado
 
@@ -201,10 +188,10 @@ O nome/IP gravado no certificado precisa bater com o endereço que o navegador v
   CERT_CN=IP-OU-DOMINIO-DO-SERVIDOR
   ```
 
-  Trocando pelo endereço com que as máquinas dos usuários enxergam o servidor (ex: `192.168.1.50` ou um domínio interno). Se precisar trocar depois de já ter subido uma vez, apague o volume do certificado para forçar gerar um novo: `docker compose down && docker volume rm cambia_reverse_proxy_certs` (o nome exato do volume pode variar — confira com `docker volume ls`).
+  Trocando pelo endereço com que as máquinas dos usuários enxergam o servidor (ex: `192.168.1.50` ou um domínio interno). Se precisar trocar depois de já ter subido uma vez, apague o volume do certificado para forçar gerar um novo: `docker compose down && docker volume rm cambia_app_certs` (o nome exato do volume pode variar — confira com `docker volume ls`).
 
 - **Aviso de "conexão não segura"**: o navegador vai mostrar esse aviso na primeira visita — é esperado (o certificado é autoassinado, não emitido por uma autoridade confiável). O tráfego continua criptografado normalmente; aceite o aviso para continuar. Se sua empresa tiver uma CA própria, ou quiser eliminar esse aviso, é possível trocar por um certificado real — consulte quem entregou o sistema.
-- **Quer usar seu próprio proxy reverso na frente mesmo assim** (ex: para centralizar TLS de vários sistemas atrás de um Traefik/nginx corporativo já existente)? Aponte-o para as portas `8443`/`8080` do container `reverse-proxy` do CambIA (não remova esse container — ele também faz o roteamento interno entre front-end e backend) e faça esse proxy externo terminar TLS antes. Consulte o suporte para orientação nesse cenário.
+- **Quer usar seu próprio proxy reverso na frente mesmo assim** (ex: para centralizar TLS de vários sistemas atrás de um Traefik/nginx corporativo já existente)? Aponte-o para as portas `8443`/`8080` do container `app` e faça esse proxy externo terminar TLS antes. Consulte o suporte para orientação nesse cenário.
 
 ## Primeiro acesso
 
@@ -228,10 +215,10 @@ Depois disso, esse endpoint passa a responder `409 Conflict` — novos usuários
 
 1. Acesse `https://localhost` (ou o endereço do servidor) — vai redirecionar para `/login`. Aceite o aviso do certificado autoassinado na primeira visita.
 2. Digite o e-mail cadastrado e clique em "Enviar link de acesso".
-3. **Enquanto o envio real de e-mail (SMTP) não estiver configurado** (próxima seção), o link não chega por e-mail de verdade — ele aparece no log do backend:
+3. **Enquanto o envio real de e-mail (SMTP) não estiver configurado** (próxima seção), o link não chega por e-mail de verdade — ele aparece no log da aplicação:
 
    ```bash
-   docker compose logs backend | grep "Link mágico"
+   docker compose logs app | grep "Link mágico"
    ```
 
    Vai aparecer algo como `Link mágico para voce@suaempresa.com.br: /auth/verify?token=xxxxxxxx-...`. Copie só o valor depois de `token=`.
@@ -241,9 +228,11 @@ A sessão dura 8 horas — fica guardada num cookie `httpOnly`, não acessível 
 
 ---
 
-## Envio real de e-mail
+## Envio real de e-mail (Microsoft 365 / Exchange Online)
 
-**Necessário antes de usar o sistema em produção de verdade.** Sem isso configurado, todo login exige pegar o token no log do backend (aceitável para homologação/teste inicial, não para os usuários finais no dia a dia). No `.env`, preencha:
+**Necessário antes de usar o sistema em produção de verdade.** Sem isso configurado, todo login exige pegar o token no log da aplicação (aceitável para homologação/teste inicial, não para os usuários finais no dia a dia).
+
+O envio é feito pelo relay SMTP do **Microsoft 365 / Exchange Online**. No `.env`, preencha:
 
 ```dotenv
 CAMBIA_MAIL_HABILITADO=true
@@ -251,26 +240,34 @@ CAMBIA_MAIL_REMETENTE=nao-responda@suaempresa.com.br
 SPRING_MAIL_HOST=smtp.office365.com
 SPRING_MAIL_PORT=587
 SPRING_MAIL_USERNAME=nao-responda@suaempresa.com.br
-SPRING_MAIL_PASSWORD=<senha-ou-token-do-relay-smtp>
+SPRING_MAIL_PASSWORD=<senha-da-caixa-de-e-mail-ou-senha-de-aplicativo>
 SPRING_MAIL_SMTP_AUTH=true
 SPRING_MAIL_SMTP_STARTTLS=true
 ```
 
-`SPRING_MAIL_HOST`/`PORT` acima são o exemplo do relay SMTP do Microsoft 365 / Exchange Online, mas funciona com qualquer servidor SMTP autenticado — ajuste conforme as credenciais reais da sua empresa. Depois de preencher, aplique com:
+`SPRING_MAIL_USERNAME` é o endereço completo da caixa de e-mail usada para enviar (precisa ser uma licença/caixa válida no seu tenant Microsoft 365 — não precisa ser a mesma de `CAMBIA_MAIL_REMETENTE`, mas geralmente é).
+
+> ⚠️ **Antes de configurar**: por padrão, tenants Microsoft 365 criados recentemente vêm com **SMTP AUTH desabilitado** para as caixas de e-mail — sem isso habilitado, a autenticação falha mesmo com usuário/senha corretos. Um administrador do Microsoft 365 precisa habilitar SMTP AUTH especificamente para a caixa usada em `SPRING_MAIL_USERNAME`: **Centro de administração do Exchange** → **Destinatários** → selecionar a caixa → **Email apps de gerenciamento** → habilitar **"Authenticated SMTP"** (ou, via PowerShell: `Set-CASMailbox -Identity usuario@suaempresa.com.br -SmtpClientAuthenticationDisabled $false`).
+>
+> Se a conta tiver autenticação multifator (MFA) ativada, a senha normal não funciona para SMTP AUTH — é preciso gerar uma **senha de aplicativo** (App Password) para essa caixa especificamente, ou usar uma caixa dedicada sem MFA só para esse envio.
+
+Depois de preencher, aplique com:
 
 ```bash
 docker compose up -d
 ```
 
-Não precisa baixar imagem nova nem recriar containers do zero — são variáveis lidas em tempo de execução pelo backend; `up -d` já detecta a mudança e reinicia só o necessário.
+Não precisa baixar imagem nova nem recriar containers do zero — são variáveis lidas em tempo de execução pela aplicação; `up -d` já detecta a mudança e reinicia só o necessário.
+
+> Os mesmos campos (`SPRING_MAIL_*`) aceitam qualquer servidor SMTP autenticado, caso o remetente de e-mail mude no futuro para outro provedor — não é uma integração exclusiva do Microsoft 365.
 
 ### Testar o envio de e-mail antes de configurar o SMTP real (opcional)
 
-Para ver como os e-mails do sistema ficam sem enviar nada de verdade, é possível usar um capturador de e-mail local (Mailpit) durante a fase de testes. No `docker-compose.yml`, adicione este serviço **dentro de `services:`, no mesmo nível de `db`/`backend`/`frontend`/`reverse-proxy`** (não dentro de `volumes:`, que fica só depois):
+Para ver como os e-mails do sistema ficam sem enviar nada de verdade, é possível usar um capturador de e-mail local (Mailpit) durante a fase de testes. No `docker-compose.yml`, adicione este serviço **dentro de `services:`, no mesmo nível de `db`/`app`** (não dentro de `volumes:`, que fica só depois):
 
 ```yaml
 services:
-  # ... db, backend, frontend, reverse-proxy já existentes ...
+  # ... db, app já existentes ...
 
   mailpit:
     image: axllent/mailpit:latest
@@ -279,7 +276,7 @@ services:
       - "1025:1025"
 
 volumes:
-  # ... db_data, reverse_proxy_certs já existentes ...
+  # ... db_data, app_certs já existentes ...
 ```
 
 E no `.env`:
@@ -292,7 +289,7 @@ SPRING_MAIL_SMTP_AUTH=false
 SPRING_MAIL_SMTP_STARTTLS=false
 ```
 
-Depois de `docker compose up -d`, acesse `http://localhost:8025` para ver os e-mails "enviados" pelo sistema. **Não use isso em produção** — é só para conferir o conteúdo do e-mail antes de configurar um SMTP de verdade.
+Depois de `docker compose up -d`, acesse `http://localhost:8025` para ver os e-mails "enviados" pelo sistema. **Não use isso em produção** — é só para conferir o conteúdo do e-mail antes de configurar o Microsoft 365 de verdade.
 
 ---
 
@@ -306,13 +303,13 @@ Todas ficam no `.env`, na mesma pasta do `docker-compose.yml`.
 |---|---|---|
 | `POSTGRES_PASSWORD` | `cambia` | Senha do banco de dados. **Troque por uma senha forte** — o padrão é só para testar, e a porta `5432` fica publicada no host. |
 | `CERT_CN` | `localhost` | Nome/IP gravado no certificado HTTPS — precisa bater com o endereço real do servidor (ver seção própria acima). |
-| `CAMBIA_MAIL_HABILITADO` + `SPRING_MAIL_*` | desligado | Envio real de e-mail — sem isso, login depende de olhar o log do backend (ver seção própria acima). |
+| `CAMBIA_MAIL_HABILITADO` + `SPRING_MAIL_*` | desligado | Envio real de e-mail via Microsoft 365 — sem isso, login depende de olhar o log da aplicação (ver seção própria acima). |
 
 ### Controle de versão
 
 | Variável | Padrão | Descrição |
 |---|---|---|
-| `CAMBIA_VERSION` | `1.0.0` | Tag de versão usada nas 3 imagens do sistema — ver "Atualizando para uma nova versão" abaixo. |
+| `CAMBIA_VERSION` | `1.0.0` | Tag de versão usada na imagem do sistema — ver "Atualizando para uma nova versão" abaixo. |
 
 ### Banco de dados externo (só se estiver usando a Opção B)
 
@@ -331,23 +328,23 @@ Cada versão nova do sistema é anunciada com o número dela (ex: `1.1.0`). Para
 # 1. Edite o .env e troque:
 CAMBIA_VERSION=1.1.0
 
-# 2. Baixe a nova versão das imagens e reinicie:
+# 2. Baixe a nova versão da imagem e reinicie:
 docker compose pull
 docker compose up -d
 ```
 
 As migrações de banco de dados novas (se houver) são aplicadas automaticamente na subida — não é preciso nenhum passo manual no banco. Os dados existentes (clientes, bancos, operações, usuários) são preservados normalmente.
 
-Para conferir a versão que está rodando: `docker compose images` mostra a tag de cada imagem em uso.
+Para conferir a versão que está rodando: `docker compose images` mostra a tag da imagem em uso.
 
 ## Comandos úteis
 
 ```bash
-# Logs em tempo real (troque "backend" por "frontend"/"reverse-proxy"/"db" conforme o caso)
-docker compose logs -f backend
+# Logs em tempo real (troque "app" por "db" para ver os logs do banco)
+docker compose logs -f app
 
 # Últimas 100 linhas de log
-docker compose logs backend --tail 100
+docker compose logs app --tail 100
 
 # Status dos containers
 docker compose ps
@@ -373,11 +370,12 @@ docker volume inspect cambia_db_data
 
 ## Solução de problemas
 
-### Banco não acessível (`ECONNREFUSED` / `connect ETIMEDOUT` nos logs do backend)
+### Banco não acessível (`ECONNREFUSED` / `connect ETIMEDOUT` nos logs do app)
 
 Se estiver usando a **Opção A** (Postgres incluso):
 - Confirme que o container `db` está rodando e saudável: `docker compose ps` (deve mostrar `healthy`).
 - Veja os logs dele: `docker compose logs db`.
+- O container `app` **reinicia sozinho** internamente se o backend cair por não conseguir falar com o banco (verifique `docker compose logs app` por `"backend caiu — tentando de novo"`) — normalmente se resolve assim que o `db` fica saudável, sem precisar de nenhuma ação manual.
 
 Se estiver usando a **Opção B** (banco próprio):
 - Confirme que o servidor está acessível a partir de onde o Docker roda: `pg_isready -h SEU_HOST -p 5432` (rode de dentro de um container, ou da própria máquina do servidor).
@@ -395,8 +393,13 @@ O navegador está rejeitando o cookie de sessão — quase sempre é um problema
 ### O link mágico não chega no e-mail
 
 - Confirme que `CAMBIA_MAIL_HABILITADO=true` e os campos `SPRING_MAIL_*` estão preenchidos corretamente no `.env` (ver "Envio real de e-mail" acima).
-- Veja os logs do backend por erros de envio: `docker compose logs backend | grep -i mail`.
-- Enquanto isso não estiver resolvido, o link continua disponível no log: `docker compose logs backend | grep "Link mágico"`.
+- **Autenticação SMTP recusada mesmo com usuário/senha corretos**: quase sempre é o SMTP AUTH desabilitado por padrão na caixa do Microsoft 365 — veja o aviso na seção "Envio real de e-mail" acima sobre como habilitar.
+- Veja os logs da aplicação por erros de envio: `docker compose logs app | grep -i mail`.
+- Enquanto isso não estiver resolvido, o link continua disponível no log: `docker compose logs app | grep "Link mágico"`.
+
+### `docker compose ps` mostra o `app` como `unhealthy`, ou `/actuator/health` responde com status diferente de `UP`
+
+Quase sempre é `SPRING_MAIL_HOST` preenchido no `.env` sem o resto da configuração de e-mail estar completa (ex: preencheu o host mas deixou `SPRING_MAIL_PASSWORD` vazio) — a checagem de saúde do sistema tenta autenticar de verdade no servidor de e-mail configurado, mesmo com `CAMBIA_MAIL_HABILITADO=false`, e falha. Ou preencha todos os campos de "Envio real de e-mail" corretamente, ou deixe `SPRING_MAIL_HOST` em branco enquanto isso não estiver pronto.
 
 ### `409 Conflict` ao tentar criar o primeiro Admin
 
@@ -408,7 +411,7 @@ As credenciais fornecidas expiraram ou estão incorretas — entre em contato co
 
 ### Erro genérico / `500 Internal Server Error`
 
-A mensagem de erro mostrada é sempre genérica de propósito (a causa real nunca é exposta ao navegador, por segurança) — a causa completa fica só no log do backend: `docker compose logs backend`. Se precisar de ajuda, inclua esse trecho do log ao contatar o suporte.
+A mensagem de erro mostrada é sempre genérica de propósito (a causa real nunca é exposta ao navegador, por segurança) — a causa completa fica só no log da aplicação: `docker compose logs app`. Se precisar de ajuda, inclua esse trecho do log ao contatar o suporte.
 
 ---
 
@@ -416,7 +419,7 @@ A mensagem de erro mostrada é sempre genérica de propósito (a causa real nunc
 
 | Versão | Tag Docker | Data | Destaques |
 |---|---|---|---|
-| v1.0.0 | `:latest` `:1.0.0` | 2026-09-03 | Primeiro release oficial — cadastros (Clientes/Bancos/Usuários), Operações de câmbio com cálculo automático completo, Fechamento Diário com exportação em PDF/Excel, Relatórios e histórico de auditoria. |
+| v1.0.0 | `:latest` `:1.0.0` | 2026-09-03 | Primeiro release oficial — cadastros (Clientes/Bancos/Usuários), Operações de câmbio com cálculo automático completo, Fechamento Diário com exportação em PDF/Excel, Relatórios e histórico de auditoria. Empacotado como imagem única (backend + front-end + HTTPS). |
 
 ## Limitações conhecidas
 
@@ -426,8 +429,8 @@ A mensagem de erro mostrada é sempre genérica de propósito (a causa real nunc
 
 ## Notas
 
-- **Dados**: ficam no PostgreSQL que você gerencia (volume `db_data`, se estiver usando a Opção A). Os containers `backend`/`frontend`/`reverse-proxy` são stateless, exceto pelo volume do certificado.
-- **Segredos**: nunca compartilhe o `.env`. Trate `POSTGRES_PASSWORD`, as credenciais SMTP e o token de acesso ao registro de imagens como senhas.
+- **Dados**: ficam no PostgreSQL que você gerencia (volume `db_data`, se estiver usando a Opção A). O container `app` é stateless, exceto pelo volume do certificado (`app_certs`).
+- **Segredos**: nunca compartilhe o `.env`. Trate `POSTGRES_PASSWORD`, a senha do Microsoft 365 e o token de acesso ao registro de imagens como senhas.
 
 ## Suporte
 

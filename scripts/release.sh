@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Corta uma nova versão do sistema CambIA: builda as 3 imagens que este projeto produz
-# a partir do próprio código-fonte (backend, frontend, reverse-proxy — db e mailpit são
-# imagens de terceiros, não entram aqui), publica no GitHub Container Registry (privado)
-# e marca a versão no git.
+# Corta uma nova versão do sistema CambIA: builda a imagem única deste projeto
+# (backend + front-end + reverse-proxy, tudo num container só — ver docker/Dockerfile;
+# db é imagem de terceiro, não entra aqui), publica no GitHub Container Registry
+# (privado) e marca a versão no git.
 #
 # Uso:
 #   ./scripts/release.sh 1.1.0     # sobe a versão (edita VERSION/pom.xml/package.json,
@@ -25,13 +25,15 @@ cd "$(dirname "$0")/.."
 GH_USER="ColaboradorLeance"
 GH_USER_LOWER="colaboradorleance"
 REGISTRY="ghcr.io"
-IMAGENS=(backend frontend reverse-proxy)
+IMAGEM_LOCAL="cambia:release"
+DESTINO="${REGISTRY}/${GH_USER_LOWER}/cambia"
 
-# Bug encontrado ao vivo na primeira execução deste script: uma falha no meio do
-# caminho (ex: push sem o escopo write:packages) interrompia o script com "set -e"
-# ANTES da linha que trocava a conta do gh de volta pra fereziniNi — deixando o `gh`
-# "preso" em ColaboradorLeance pro resto da sessão. Um trap em EXIT roda sempre,
-# sucesso ou erro, então a conta (e a sessão docker login) sempre voltam ao normal.
+# Bug encontrado ao vivo na primeira execução deste script (quando ainda buildava 3
+# imagens separadas — a lição continua valendo aqui): uma falha no meio do caminho (ex:
+# push sem o escopo write:packages) interrompia o script com "set -e" ANTES da linha
+# que trocava a conta do gh de volta pra fereziniNi — deixando o `gh` "preso" em
+# ColaboradorLeance pro resto da sessão. Um trap em EXIT roda sempre, sucesso ou erro,
+# então a conta (e a sessão docker login) sempre voltam ao normal.
 trap 'gh auth switch --user fereziniNi > /dev/null 2>&1 || true; docker logout "$REGISTRY" > /dev/null 2>&1 || true' EXIT
 
 VERSAO_ATUAL="$(cat VERSION)"
@@ -73,29 +75,23 @@ fi
 echo "==> Rodando suíte de testes do backend antes de buildar a imagem..."
 ./mvnw -q test
 
-echo "==> Buildando as imagens (sem cache, pra garantir que refletem exatamente este código)..."
-docker compose build --no-cache backend frontend reverse-proxy
+echo "==> Buildando a imagem única (sem cache, pra garantir que reflete exatamente este código)..."
+docker build --no-cache -f docker/Dockerfile -t "$IMAGEM_LOCAL" .
 
 echo "==> Autenticando no $REGISTRY como $GH_USER..."
 gh auth switch --user "$GH_USER"
 gh auth token | docker login "$REGISTRY" -u "$GH_USER_LOWER" --password-stdin
 
-for imagem in "${IMAGENS[@]}"; do
-	tag_local="cambia-${imagem}:latest"
-	destino="${REGISTRY}/${GH_USER_LOWER}/cambia-${imagem}"
-
-	echo "==> Marcando e publicando ${destino}:${NOVA_VERSAO} e ${destino}:latest..."
-	docker tag "$tag_local" "${destino}:${NOVA_VERSAO}"
-	docker tag "$tag_local" "${destino}:latest"
-	docker push "${destino}:${NOVA_VERSAO}"
-	docker push "${destino}:latest"
-done
+echo "==> Marcando e publicando ${DESTINO}:${NOVA_VERSAO} e ${DESTINO}:latest..."
+docker tag "$IMAGEM_LOCAL" "${DESTINO}:${NOVA_VERSAO}"
+docker tag "$IMAGEM_LOCAL" "${DESTINO}:latest"
+docker push "${DESTINO}:${NOVA_VERSAO}"
+docker push "${DESTINO}:latest"
 
 echo ""
 echo "==> Versão ${NOVA_VERSAO} publicada com sucesso em:"
-for imagem in "${IMAGENS[@]}"; do
-	echo "    ${REGISTRY}/${GH_USER_LOWER}/cambia-${imagem}:${NOVA_VERSAO}"
-done
+echo "    ${DESTINO}:${NOVA_VERSAO}"
+echo "    ${DESTINO}:latest"
 echo ""
 echo "Lembrete: registrar esta versão em docs/decisoes.md (local, não vai pro git) e"
-echo "avisar o cliente/repassar as credenciais de acesso ao pacote (imagens privadas)."
+echo "avisar o cliente/repassar as credenciais de acesso ao pacote (imagem privada)."
