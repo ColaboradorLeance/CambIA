@@ -226,23 +226,37 @@ Copie o valor depois de `token=` e cole no campo "Token" da tela. Sessão dura 8
 
 ## Variáveis de ambiente
 
-Todas ficam no arquivo `.env` (passo 2).
+Todas ficam no arquivo `.env` (passo 2), lido pela flag `--env-file .env` no `docker run` do app (passo 4). Diferente de outras ferramentas, aqui **não existe indireção de valor padrão no `.env`** — o que estiver escrito é exatamente o que a aplicação recebe; os "padrões" mencionados abaixo são valores que a própria aplicação já assume sozinha **quando a variável nem aparece no arquivo** (linha ausente, não uma linha vazia).
 
-| Variável | Descrição |
-|---|---|
-| `SPRING_DATASOURCE_URL` | String de conexão JDBC do banco — ver "Banco de dados". |
-| `SPRING_DATASOURCE_USERNAME` | Usuário do banco. |
-| `SPRING_DATASOURCE_PASSWORD` | Senha do banco. |
-| `CERT_CN` | Nome/IP gravado no certificado HTTPS — precisa bater com o endereço real do servidor. |
-| `CAMBIA_CORS_ORIGEM_ADICIONAL` | `https://` + o mesmo valor de `CERT_CN`. |
-| `CAMBIA_MAIL_HABILITADO` | `true` liga o envio real de e-mail. Sem isso, login depende do log. |
-| `CAMBIA_MAIL_REMETENTE` | E-mail exibido como remetente das mensagens. |
-| `SPRING_MAIL_HOST` | Servidor SMTP. Para Microsoft 365: `smtp.office365.com`. |
-| `SPRING_MAIL_PORT` | Porta do servidor SMTP (`587` para Microsoft 365). |
-| `SPRING_MAIL_USERNAME` | Caixa de e-mail usada para autenticar no SMTP. |
-| `SPRING_MAIL_PASSWORD` | Senha (ou senha de aplicativo) dessa caixa. |
-| `SPRING_MAIL_SMTP_AUTH` | Autenticação SMTP — `true` para Microsoft 365. |
-| `SPRING_MAIL_SMTP_STARTTLS` | STARTTLS — `true` para Microsoft 365. |
+### Banco de dados
+
+| Variável | Obrigatória | Exemplo | O que é / o que acontece se estiver errado |
+|---|---|---|---|
+| `SPRING_DATASOURCE_URL` | **Sim, sem padrão** | `jdbc:postgresql://cambia-db:5432/cambia` | String de conexão JDBC completa: `jdbc:postgresql://` + host + `:` + porta + `/` + nome do banco. Na **Opção A**, o host é sempre `cambia-db` (nome do container criado no passo 3) — nunca um IP, já que os dois containers se enxergam pelo nome dentro da rede `cambia-net`. Na **Opção B**, é o endereço/domínio real do seu servidor Postgres. A porta padrão do Postgres é `5432`; o nome do banco (`cambia`) precisa já existir no servidor de destino. Se o host não existir ou a porta estiver fechada, o backend não consegue conectar e fica reiniciando sozinho — aparece `"backend caiu — tentando de novo em 3s..."` repetidamente em `docker logs cambia`. |
+| `SPRING_DATASOURCE_USERNAME` | **Sim, sem padrão** | `cambia` | Usuário do Postgres. Na Opção A, precisa ser **idêntico** ao valor passado em `-e POSTGRES_USER` no `docker run` do banco (passo 3) — são dois lugares diferentes guardando a mesma informação, nada os mantém sincronizados automaticamente. Na Opção B, um usuário que sua equipe de banco já criou. |
+| `SPRING_DATASOURCE_PASSWORD` | **Sim, sem padrão** | (escolha uma senha forte) | Senha desse usuário. Mesma observação: na Opção A precisa bater **exatamente** com `-e POSTGRES_PASSWORD` do passo 3 — se divergir, o Postgres recusa a conexão por senha incorreta e o backend fica no mesmo loop de reinício automático citado acima. É a senha técnica de conexão ao banco, não a senha de nenhum usuário do sistema (o CambIA não usa senha para login — ver "Primeiro acesso"). |
+
+### Certificado HTTPS e endereço do servidor
+
+| Variável | Obrigatória | Exemplo | O que é / o que acontece se estiver errado |
+|---|---|---|---|
+| `CERT_CN` | Não — **padrão `localhost`** se a linha não existir no `.env` | `192.168.1.50` ou `cambia.suaempresa.local` | Nome/IP gravado dentro do certificado HTTPS autoassinado, gerado uma única vez na primeira subida do container (guardado no volume `cambia-certs` — ver "Certificado HTTPS"). Precisa ser **exatamente** o endereço que aparece na barra do navegador. Se divergir (ex: você acessa por `https://192.168.1.50` mas o certificado foi gerado com `CERT_CN=localhost`), o navegador rejeita o certificado de forma mais severa que o aviso normal de autoassinado, e pode impedir até o cookie de sessão de ser aceito, quebrando o login. Só tem efeito **na primeira subida** — mudar depois exige apagar o volume do certificado e recriar o container (comando na seção "Certificado HTTPS"). |
+| `CAMBIA_CORS_ORIGEM_ADICIONAL` | Não — **padrão `https://localhost`** se a linha não existir no `.env` | `https://192.168.1.50` | Sempre `https://` + o mesmo valor de `CERT_CN` (sem porta no final). É a origem que o navegador tem permissão de chamar na API — se não bater com o endereço real, toda chamada do front-end pro backend é bloqueada com erro de CORS visível no console do navegador (F12), mesmo que o certificado já tenha sido aceito. Sempre que mudar `CERT_CN`, mude esta também, mantendo os dois consistentes. |
+
+### E-mail — envio do link de login (Microsoft 365 / Exchange Online)
+
+Ver também a seção "E-mail" logo abaixo, com o passo a passo completo de configuração.
+
+| Variável | Obrigatória | Exemplo | O que é / o que acontece se estiver errado |
+|---|---|---|---|
+| `CAMBIA_MAIL_HABILITADO` | Não — **padrão `false`** | `true` | Interruptor geral. `false` (ou linha ausente): o sistema funciona normalmente, mas o link de login **nunca é enviado por e-mail de verdade** — só aparece no log do container (`docker logs cambia \| grep "Link mágico"`), o que é aceitável pra homologação mas não pra uso real com vários usuários. `true`: exige as demais variáveis de e-mail abaixo preenchidas corretamente — sem isso, os e-mails simplesmente falham ao enviar (ver "Solução de problemas"). |
+| `CAMBIA_MAIL_REMETENTE` | Só se `CAMBIA_MAIL_HABILITADO=true` | `nao-responda@suaempresa.com.br` | Endereço que aparece no campo "De:" dos e-mails. Tecnicamente pode ser diferente da caixa que autentica no SMTP (`SPRING_MAIL_USERNAME`), mas usar um remetente diferente da caixa autenticada é uma causa comum de e-mail cair em spam ou ser rejeitado (falha de verificação SPF/DKIM do seu domínio) — normalmente use o mesmo endereço nas duas variáveis. |
+| `SPRING_MAIL_HOST` | Só se habilitado; **sem padrão** (deixe a linha vazia enquanto não configurar) | `smtp.office365.com` | Endereço do servidor SMTP — para Microsoft 365/Exchange Online é sempre este valor fixo. ⚠️ Preencher esta variável sem terminar de configurar **todo** o restante do bloco de e-mail corretamente já é suficiente pra derrubar a checagem de saúde do sistema (`/actuator/health` deixa de responder `UP`) — deixe em branco até estar pronto pra seguir a seção "E-mail" inteira de uma vez. |
+| `SPRING_MAIL_PORT` | Só se habilitado | `587` | Porta do servidor SMTP. `587` é a porta padrão de envio autenticado com STARTTLS, a que o Microsoft 365 usa — não mude a menos que seu provedor de e-mail exija explicitamente outra porta. |
+| `SPRING_MAIL_USERNAME` | Só se habilitado | `nao-responda@suaempresa.com.br` | Caixa de e-mail usada para **autenticar** no servidor SMTP (login técnico do envio — diferente do "remetente visível", embora geralmente sejam o mesmo endereço). Precisa ser uma caixa real, com licença ativa, no seu tenant Microsoft 365. |
+| `SPRING_MAIL_PASSWORD` | Só se habilitado | (senha da caixa, ou senha de aplicativo) | Senha da caixa acima. Se essa caixa tiver autenticação multifator (MFA) ativada, a senha normal da conta **não funciona** para SMTP — é preciso gerar uma "senha de aplicativo" específica no Microsoft 365 (ver seção "E-mail"). |
+| `SPRING_MAIL_SMTP_AUTH` | Não — **padrão `true`** | `true` | Liga a autenticação usuário/senha na conexão SMTP. Deixe `true` para Microsoft 365 — sem autenticação, a Microsoft recusa a conexão imediatamente. Só existe pra permitir `false` em servidores de teste sem autenticação (fora do escopo deste guia). |
+| `SPRING_MAIL_SMTP_STARTTLS` | Não — **padrão `true`** | `true` | Liga a criptografia STARTTLS na conexão SMTP, exigida na porta `587`. Deixe `true` para Microsoft 365. |
 
 ---
 
