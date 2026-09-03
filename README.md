@@ -1,52 +1,29 @@
 # CambIA
 
-Instruções para instalar e rodar o sistema CambIA usando a imagem Docker oficial.
+Sistema para registrar e controlar operações de câmbio (compra/venda de moeda estrangeira), rodando **dentro da sua própria infraestrutura** — nenhum dado sai do seu servidor.
 
-> Este documento é para quem vai **rodar o sistema** (cliente final). Se você é desenvolvedor do CambIA e precisa do código-fonte, veja [DEVELOPMENT.md](DEVELOPMENT.md).
+Cadastros (Clientes, Bancos, Usuários), Operações com cálculo financeiro automático, Fechamento Diário (com PDF/Excel e envio por e-mail), Relatórios e histórico de auditoria completo.
 
-Sistema para registrar e controlar operações de compra e venda de moedas internacionais (câmbio), rodando **dentro da sua própria infraestrutura** (on-premise) — nenhum dado sai do seu servidor.
-
-## O que o sistema oferece
-
-- **Cadastros**: Clientes, Bancos (com fórmula de comissão própria por banco) e Usuários (perfis Admin / Analista / Consultor).
-- **Operações de câmbio**: registro, edição, confirmação e cancelamento, com cálculo automático de todos os valores financeiros no momento da confirmação (R$, Total Bruto, Comissão, Spread, Custo, Rebate, etc.).
-- **Fechamento Diário**: resumo operacional e financeiro de qualquer data, com exportação em PDF e Excel, e envio automático por e-mail num horário configurável.
-- **Relatórios**: operações filtradas, comparativo entre períodos, rankings (por cliente, banco, moeda, usuário) e posição em aberto.
-- **Histórico de auditoria**: todo evento de uma operação (criação, edição, confirmação, cancelamento) fica registrado com autor e data/hora.
-
-## Imagem
-
-O CambIA roda como **uma única imagem** — backend, front-end e o HTTPS (reverse-proxy) vêm todos juntos no mesmo container, mais simples de instalar e operar. O único outro container necessário é o banco de dados (PostgreSQL, imagem oficial de terceiros — nunca entra na imagem do CambIA, para não arriscar dados em caso de recriação do container).
-
-| Imagem | Tags disponíveis | Quando usar |
-|---|---|---|
-| `ghcr.io/colaboradorleance/cambia` | `:1.0.0`, `:latest` | `:X.Y.Z` (versão exata, imutável) — **recomendada para produção**, fixa exatamente o que está rodando. `:latest` sempre aponta para a versão mais recente publicada — útil só para testar antes de decidir fixar uma versão. |
-
-**Portas expostas**: `443` (HTTPS, ponto de entrada principal) e `80` (só redireciona para HTTPS). Não existe porta separada para o front-end nem para a API — tudo fica atrás do mesmo HTTPS, na mesma origem.
+Backend, front-end e HTTPS vêm todos numa **única imagem Docker**. O único outro container é o banco de dados (PostgreSQL).
 
 ## Pré-requisitos
 
-- Docker Engine e Docker Compose plugin instalados (`docker compose version` deve funcionar). No Windows/Mac, o [Docker Desktop](https://www.docker.com/products/docker-desktop/) já traz os dois; em Linux, veja o [guia oficial](https://docs.docker.com/engine/install/).
-- Portas `443` e `80` livres no servidor (e `5432` se for usar o Postgres incluso e quiser acessá-lo de outra máquina — ver "Banco de dados" abaixo).
-- **Token de acesso ao registro de imagens** — solicite a quem entregou o sistema. A imagem é **privada**, não pública.
+- Docker Engine + Docker Compose plugin instalados (`docker compose version` funcionando). [Docker Desktop](https://www.docker.com/products/docker-desktop/) no Windows/Mac já traz os dois.
+- Portas `443` e `80` livres no servidor.
+- **Token de acesso à imagem** (privada) — solicite a quem entregou o sistema.
 
-> **Windows (PowerShell)**: os comandos deste guia usam sintaxe de shell Unix (bash). A maioria funciona sem alteração no PowerShell — a única diferença aparece em comandos que quebram linha com `\`: no PowerShell, troque `\` por `` ` `` (crase) no fim da linha, ou junte tudo numa linha só.
-
----
+> **PowerShell**: nos comandos que quebram linha com `\`, troque por `` ` `` (crase) no fim da linha, ou junte tudo numa linha só.
 
 ## Instalação
 
-### 1. Autenticar no registro de imagens
+**1. Login no registro de imagens** (uma vez por máquina):
 
 ```bash
 docker login ghcr.io -u <usuário-fornecido>
 ```
+Quando pedir senha, cole o **token de acesso** fornecido.
 
-Vai pedir uma senha — cole o **token de acesso** fornecido (não é a senha de uma conta comum). Essa autenticação fica salva localmente; não precisa repetir a cada atualização, só se trocar de servidor/máquina.
-
-### 2. Criar a pasta do sistema e o `docker-compose.yml`
-
-Crie uma pasta para o sistema (ex: `cambia/`) e, dentro dela, um arquivo `docker-compose.yml` com o conteúdo abaixo:
+**2. Crie uma pasta e, dentro dela, o `docker-compose.yml`:**
 
 ```yaml
 services:
@@ -96,27 +73,15 @@ volumes:
   app_certs:
 ```
 
-`app` usa `image:` (baixada pronta) — nenhum código-fonte é necessário nesta máquina. `db` usa a imagem oficial do Postgres, baixada direto do Docker Hub.
-
-### 3. Configurar o `.env`
-
-Na mesma pasta, crie um arquivo `.env`:
+**3. Na mesma pasta, crie o `.env`** (veja a tabela completa de variáveis mais abaixo):
 
 ```dotenv
-# Versão do sistema a usar — combina com a tag da imagem acima.
-# Ver "Atualizando para uma nova versão" antes de mudar este valor.
 CAMBIA_VERSION=1.0.0
-
-# Senha do banco de dados — TROQUE por uma senha forte antes de rodar em produção.
-POSTGRES_PASSWORD=
-
-# Nome/IP do servidor gravado no certificado HTTPS — ver seção própria abaixo.
+POSTGRES_PASSWORD=troque-por-uma-senha-forte
 CERT_CN=localhost
 
-# Envio do link mágico de login por e-mail (Microsoft 365 / Exchange Online) — ver
-# "Envio real de e-mail" abaixo. Deixe em branco por enquanto: preencher SPRING_MAIL_HOST
-# aqui SEM configurar o resto direito faz até a checagem de saúde do sistema falhar
-# (tenta autenticar de verdade e não consegue) — só preencha ao seguir aquela seção.
+# Deixe em branco por enquanto — preencha só ao seguir a seção "E-mail" abaixo.
+# Preencher SPRING_MAIL_HOST sem o resto da configuração faz até o healthcheck falhar.
 CAMBIA_MAIL_HABILITADO=false
 CAMBIA_MAIL_REMETENTE=
 SPRING_MAIL_HOST=
@@ -127,112 +92,70 @@ SPRING_MAIL_SMTP_AUTH=true
 SPRING_MAIL_SMTP_STARTTLS=true
 ```
 
-Todos os campos têm um valor padrão que já funciona para testar — a tabela completa, incluindo o que é recomendado mudar antes de produção, está na seção "Variáveis de ambiente" mais abaixo.
-
-### 4. Banco de dados — escolha uma opção
-
-**Opção A — Postgres incluso (padrão, mais simples)**: nada a fazer — o serviço `db` do `docker-compose.yml` do passo 2 já cuida disso. Os dados ficam no volume `db_data`, persistindo mesmo que os containers sejam recriados.
-
-**Opção B — usar um Postgres que sua empresa já tem**: remova o serviço `db` inteiro (e a linha `db_data:` de `volumes:`) do `docker-compose.yml`, e troque o `depends_on:` do `app` por nada (remova essas duas linhas também). No `.env`, adicione:
+**4. (Opcional) Banco de dados já existente**: se sua empresa já tem um Postgres, remova o serviço `db` inteiro (e a linha `db_data:` de `volumes:` e o `depends_on:` do `app`) do `docker-compose.yml`, e defina no `.env`:
 
 ```dotenv
 SPRING_DATASOURCE_URL=jdbc:postgresql://SEU_HOST:5432/SEU_BANCO
 SPRING_DATASOURCE_USERNAME=seu_usuario
 POSTGRES_PASSWORD=sua_senha
 ```
+(o usuário do banco precisa poder criar tabelas na primeira subida — é quando as migrações são aplicadas automaticamente, sem passo manual nenhum.)
 
-(sim, `POSTGRES_PASSWORD` continua sendo a variável usada — mesmo sem o serviço `db`, é ela que o `app` usa como senha do banco de dados.)
-
-> O usuário do banco precisa poder criar tabelas no schema `public` na primeira subida — é quando o Flyway aplica as migrações automaticamente (ver próxima seção). Depois da primeira subida, esse privilégio pode ser revogado até a próxima atualização de versão que traga uma migração nova.
-
-### 5. Migrações do banco de dados
-
-Diferente de sistemas que exigem rodar um comando de migração à parte, o CambIA aplica as migrações do banco **sozinho, automaticamente, toda vez que o backend inicia** (via Flyway) — não existe nenhum passo manual aqui. Isso acontece já no próximo passo, ao subir os containers.
-
-### 6. Subir os containers
+**5. Suba tudo:**
 
 ```bash
 docker compose pull
 docker compose up -d
+docker compose logs -f app   # acompanhe até aparecer "Started CambIaApplication"
 ```
 
-O primeiro comando baixa as imagens; o segundo sobe tudo, aplica as migrações do banco e inicia a aplicação. Acompanhe os logs até ver `Started CambIaApplication`:
-
-```bash
-docker compose logs -f app
-```
-
-### 7. Verificar
+**6. Verifique:**
 
 ```bash
 curl -k https://localhost/actuator/health
 # {"status":"UP"}
 ```
+(o `-k` é só pra linha de comando, por causa do certificado autoassinado — ver seção abaixo). O sistema fica em `https://localhost` (ou `https://SEU_SERVIDOR`).
 
-(o `-k` ignora o aviso do certificado autoassinado — só para linha de comando; no navegador, ver a seção de certificado abaixo). O sistema inteiro fica em `https://localhost` (ou `https://SEU_SERVIDOR`, a partir de outra máquina).
-
----
-
-## Proxy reverso e certificado HTTPS — já incluso, nada a configurar
-
-Diferente de sistemas que esperam você colocar um nginx/Traefik/Caddy próprio na frente, **o CambIA já vem com o seu próprio HTTPS embutido**, no mesmo container `app`. Ele liga sozinho, com um certificado autoassinado gerado automaticamente na primeira subida (guardado num volume Docker, não é regerado nas próximas vezes). Não é preciso instalar nem configurar nenhum proxy externo para o sistema funcionar.
-
-### `CERT_CN` — o nome/IP do servidor gravado no certificado
-
-O nome/IP gravado no certificado precisa bater com o endereço que o navegador vai usar para acessar:
-
-- **Testando na mesma máquina**: não precisa mudar nada, o padrão `CERT_CN=localhost` já funciona.
-- **Rodando num servidor e acessando de outras máquinas na rede**: defina no `.env`, **antes da primeira subida**:
-
-  ```dotenv
-  CERT_CN=IP-OU-DOMINIO-DO-SERVIDOR
-  ```
-
-  Trocando pelo endereço com que as máquinas dos usuários enxergam o servidor (ex: `192.168.1.50` ou um domínio interno). Se precisar trocar depois de já ter subido uma vez, apague o volume do certificado para forçar gerar um novo: `docker compose down && docker volume rm cambia_app_certs` (o nome exato do volume pode variar — confira com `docker volume ls`).
-
-- **Aviso de "conexão não segura"**: o navegador vai mostrar esse aviso na primeira visita — é esperado (o certificado é autoassinado, não emitido por uma autoridade confiável). O tráfego continua criptografado normalmente; aceite o aviso para continuar. Se sua empresa tiver uma CA própria, ou quiser eliminar esse aviso, é possível trocar por um certificado real — consulte quem entregou o sistema.
-- **Quer usar seu próprio proxy reverso na frente mesmo assim** (ex: para centralizar TLS de vários sistemas atrás de um Traefik/nginx corporativo já existente)? Aponte-o para as portas `8443`/`8080` do container `app` e faça esse proxy externo terminar TLS antes. Consulte o suporte para orientação nesse cenário.
-
-## Primeiro acesso
-
-O sistema não vem com nenhum usuário cadastrado — diferente de sistemas que criam um Admin sozinhos na primeira inicialização a partir de uma senha definida em variável de ambiente, o CambIA não tem senha nenhuma (autenticação é só por link mágico), então esse primeiro usuário é criado explicitamente por você, chamando o endpoint abaixo.
-
-### 1. Criar o primeiro usuário (Admin)
-
-O primeiro Admin é criado por um endpoint que **só funciona uma única vez**, enquanto não existir nenhum usuário no banco:
+**7. Crie o primeiro usuário (Admin)** — só funciona uma vez, enquanto não existir nenhum usuário:
 
 ```bash
 curl -k -X POST https://localhost/auth/bootstrap-admin \
   -H "Content-Type: application/json" \
   -d '{"nome":"Seu Nome","email":"voce@suaempresa.com.br"}'
 ```
+Depois disso, novos usuários são criados pela tela "Usuários", por um Admin logado.
 
-> **PowerShell**: troque as barras `\` do fim de cada linha por crases `` ` ``, ou escreva tudo numa linha só.
+**8. Faça login** — sem senha, por link mágico: acesse `https://localhost`, digite o e-mail cadastrado e clique em "Enviar link de acesso". Enquanto o e-mail (próxima seção) não estiver configurado, pegue o token no log:
 
-Depois disso, esse endpoint passa a responder `409 Conflict` — novos usuários são criados de dentro do sistema, pela tela "Usuários", por um Admin já logado.
+```bash
+docker compose logs app | grep "Link mágico"
+```
+Copie o valor depois de `token=` e cole no campo "Token" da tela. Sessão dura 8h; o link expira em 15min ou no primeiro uso.
 
-### 2. Fazer login (sem senha, por link mágico)
+## Variáveis de ambiente
 
-1. Acesse `https://localhost` (ou o endereço do servidor) — vai redirecionar para `/login`. Aceite o aviso do certificado autoassinado na primeira visita.
-2. Digite o e-mail cadastrado e clique em "Enviar link de acesso".
-3. **Enquanto o envio real de e-mail (SMTP) não estiver configurado** (próxima seção), o link não chega por e-mail de verdade — ele aparece no log da aplicação:
+Todas ficam no `.env`, na mesma pasta do `docker-compose.yml`.
 
-   ```bash
-   docker compose logs app | grep "Link mágico"
-   ```
+| Variável | Padrão | Para quê |
+|---|---|---|
+| `CAMBIA_VERSION` | `1.0.0` | Versão/tag da imagem a rodar — ver "Atualizar versão" abaixo. |
+| `POSTGRES_PASSWORD` | `cambia` | Senha do banco. **Troque em produção** — a porta `5432` fica publicada no host. |
+| `CERT_CN` | `localhost` | Nome/IP gravado no certificado HTTPS — precisa bater com o endereço real do servidor. |
+| `CAMBIA_MAIL_HABILITADO` | `false` | Liga o envio real de e-mail. Sem isso, login depende do log (ver acima). |
+| `CAMBIA_MAIL_REMETENTE` | — | E-mail exibido como remetente das mensagens. |
+| `SPRING_MAIL_HOST` | — | Servidor SMTP. Para Microsoft 365: `smtp.office365.com`. |
+| `SPRING_MAIL_PORT` | `587` | Porta do servidor SMTP. |
+| `SPRING_MAIL_USERNAME` | — | Caixa de e-mail usada para autenticar no SMTP. |
+| `SPRING_MAIL_PASSWORD` | — | Senha (ou senha de aplicativo) dessa caixa. |
+| `SPRING_MAIL_SMTP_AUTH` | `true` | Autenticação SMTP — deixe `true` para Microsoft 365. |
+| `SPRING_MAIL_SMTP_STARTTLS` | `true` | STARTTLS — deixe `true` para Microsoft 365. |
+| `SPRING_DATASOURCE_URL` | `jdbc:postgresql://db:5432/cambia` | Só se usar banco de dados externo (ver passo 4). |
+| `SPRING_DATASOURCE_USERNAME` | `cambia` | Só se usar banco de dados externo. |
 
-   Vai aparecer algo como `Link mágico para voce@suaempresa.com.br: /auth/verify?token=xxxxxxxx-...`. Copie só o valor depois de `token=`.
-4. Cole esse valor no campo "Token" da tela e clique em "Entrar".
+## E-mail (Microsoft 365 / Exchange Online)
 
-A sessão dura 8 horas — fica guardada num cookie `httpOnly`, não acessível por JavaScript; cada link mágico expira em 15 minutos ou no primeiro uso. Tentativas repetidas de login (por e-mail ou por IP) têm um limite — depois de algumas tentativas seguidas, é preciso esperar alguns minutos.
-
----
-
-## Envio real de e-mail (Microsoft 365 / Exchange Online)
-
-**Necessário antes de usar o sistema em produção de verdade.** Sem isso configurado, todo login exige pegar o token no log da aplicação (aceitável para homologação/teste inicial, não para os usuários finais no dia a dia).
-
-O envio é feito pelo relay SMTP do **Microsoft 365 / Exchange Online**. No `.env`, preencha:
+**Necessário antes de usar em produção de verdade** — sem isso, login sempre depende do log. No `.env`:
 
 ```dotenv
 CAMBIA_MAIL_HABILITADO=true
@@ -240,198 +163,63 @@ CAMBIA_MAIL_REMETENTE=nao-responda@suaempresa.com.br
 SPRING_MAIL_HOST=smtp.office365.com
 SPRING_MAIL_PORT=587
 SPRING_MAIL_USERNAME=nao-responda@suaempresa.com.br
-SPRING_MAIL_PASSWORD=<senha-da-caixa-de-e-mail-ou-senha-de-aplicativo>
+SPRING_MAIL_PASSWORD=<senha-da-caixa-ou-senha-de-aplicativo>
 SPRING_MAIL_SMTP_AUTH=true
 SPRING_MAIL_SMTP_STARTTLS=true
 ```
 
-`SPRING_MAIL_USERNAME` é o endereço completo da caixa de e-mail usada para enviar (precisa ser uma licença/caixa válida no seu tenant Microsoft 365 — não precisa ser a mesma de `CAMBIA_MAIL_REMETENTE`, mas geralmente é).
+Depois de preencher: `docker compose up -d` (não precisa baixar imagem nova, `up -d` já aplica).
 
-> ⚠️ **Antes de configurar**: por padrão, tenants Microsoft 365 criados recentemente vêm com **SMTP AUTH desabilitado** para as caixas de e-mail — sem isso habilitado, a autenticação falha mesmo com usuário/senha corretos. Um administrador do Microsoft 365 precisa habilitar SMTP AUTH especificamente para a caixa usada em `SPRING_MAIL_USERNAME`: **Centro de administração do Exchange** → **Destinatários** → selecionar a caixa → **Email apps de gerenciamento** → habilitar **"Authenticated SMTP"** (ou, via PowerShell: `Set-CASMailbox -Identity usuario@suaempresa.com.br -SmtpClientAuthenticationDisabled $false`).
->
-> Se a conta tiver autenticação multifator (MFA) ativada, a senha normal não funciona para SMTP AUTH — é preciso gerar uma **senha de aplicativo** (App Password) para essa caixa especificamente, ou usar uma caixa dedicada sem MFA só para esse envio.
+> ⚠️ Tenants Microsoft 365 recentes vêm com **SMTP AUTH desabilitado** por padrão nas caixas de e-mail — sem habilitar, a autenticação falha mesmo com senha certa. Um admin do M365 habilita em: Centro de administração do Exchange → Destinatários → a caixa usada em `SPRING_MAIL_USERNAME` → Email apps → **"Authenticated SMTP"** (ou via PowerShell: `Set-CASMailbox -Identity usuario@suaempresa.com.br -SmtpClientAuthenticationDisabled $false`). Se a caixa tiver MFA ativado, use uma **senha de aplicativo** em vez da senha normal.
 
-Depois de preencher, aplique com:
+## Certificado HTTPS
 
-```bash
-docker compose up -d
-```
+O HTTPS já vem embutido na imagem — gera um certificado autoassinado sozinho na primeira subida (guardado num volume, não é regerado depois). O navegador mostra um aviso de "conexão não segura" na primeira visita (esperado — é autoassinado, mas o tráfego é criptografado normalmente); aceite para continuar.
 
-Não precisa baixar imagem nova nem recriar containers do zero — são variáveis lidas em tempo de execução pela aplicação; `up -d` já detecta a mudança e reinicia só o necessário.
+Se for acessar de **outras máquinas na rede** (não só localhost), defina `CERT_CN` no `.env` **antes da primeira subida** com o IP/domínio real (ex: `192.168.1.50`). Pra trocar depois de já ter subido: `docker compose down && docker volume rm cambia_app_certs` (confira o nome exato com `docker volume ls`) e suba de novo.
 
-> Os mesmos campos (`SPRING_MAIL_*`) aceitam qualquer servidor SMTP autenticado, caso o remetente de e-mail mude no futuro para outro provedor — não é uma integração exclusiva do Microsoft 365.
-
-### Testar o envio de e-mail antes de configurar o SMTP real (opcional)
-
-Para ver como os e-mails do sistema ficam sem enviar nada de verdade, é possível usar um capturador de e-mail local (Mailpit) durante a fase de testes. No `docker-compose.yml`, adicione este serviço **dentro de `services:`, no mesmo nível de `db`/`app`** (não dentro de `volumes:`, que fica só depois):
-
-```yaml
-services:
-  # ... db, app já existentes ...
-
-  mailpit:
-    image: axllent/mailpit:latest
-    ports:
-      - "8025:8025"
-      - "1025:1025"
-
-volumes:
-  # ... db_data, app_certs já existentes ...
-```
-
-E no `.env`:
-
-```dotenv
-CAMBIA_MAIL_HABILITADO=true
-SPRING_MAIL_HOST=mailpit
-SPRING_MAIL_PORT=1025
-SPRING_MAIL_SMTP_AUTH=false
-SPRING_MAIL_SMTP_STARTTLS=false
-```
-
-Depois de `docker compose up -d`, acesse `http://localhost:8025` para ver os e-mails "enviados" pelo sistema. **Não use isso em produção** — é só para conferir o conteúdo do e-mail antes de configurar o Microsoft 365 de verdade.
-
----
-
-## Variáveis de ambiente
-
-Todas ficam no `.env`, na mesma pasta do `docker-compose.yml`.
-
-### Recomendado alterar antes de produção real
-
-| Variável | Padrão | Descrição |
-|---|---|---|
-| `POSTGRES_PASSWORD` | `cambia` | Senha do banco de dados. **Troque por uma senha forte** — o padrão é só para testar, e a porta `5432` fica publicada no host. |
-| `CERT_CN` | `localhost` | Nome/IP gravado no certificado HTTPS — precisa bater com o endereço real do servidor (ver seção própria acima). |
-| `CAMBIA_MAIL_HABILITADO` + `SPRING_MAIL_*` | desligado | Envio real de e-mail via Microsoft 365 — sem isso, login depende de olhar o log da aplicação (ver seção própria acima). |
-
-### Controle de versão
-
-| Variável | Padrão | Descrição |
-|---|---|---|
-| `CAMBIA_VERSION` | `1.0.0` | Tag de versão usada na imagem do sistema — ver "Atualizando para uma nova versão" abaixo. |
-
-### Banco de dados externo (só se estiver usando a Opção B)
-
-| Variável | Padrão | Descrição |
-|---|---|---|
-| `SPRING_DATASOURCE_URL` | `jdbc:postgresql://db:5432/cambia` | String de conexão JDBC completa do seu Postgres. |
-| `SPRING_DATASOURCE_USERNAME` | `cambia` | Usuário do banco. |
-
-(a senha do banco externo usa a mesma variável `POSTGRES_PASSWORD` da tabela acima.)
-
-## Atualizando para uma nova versão
-
-Cada versão nova do sistema é anunciada com o número dela (ex: `1.1.0`). Para atualizar:
+## Atualizar versão
 
 ```bash
-# 1. Edite o .env e troque:
+# no .env, troque:
 CAMBIA_VERSION=1.1.0
-
-# 2. Baixe a nova versão da imagem e reinicie:
+# depois:
 docker compose pull
 docker compose up -d
 ```
-
-As migrações de banco de dados novas (se houver) são aplicadas automaticamente na subida — não é preciso nenhum passo manual no banco. Os dados existentes (clientes, bancos, operações, usuários) são preservados normalmente.
-
-Para conferir a versão que está rodando: `docker compose images` mostra a tag da imagem em uso.
+Migrações de banco novas (se houver) aplicam sozinhas; dados existentes são preservados. Versão em uso: `docker compose images`.
 
 ## Comandos úteis
 
 ```bash
-# Logs em tempo real (troque "app" por "db" para ver os logs do banco)
-docker compose logs -f app
-
-# Últimas 100 linhas de log
-docker compose logs app --tail 100
-
-# Status dos containers
-docker compose ps
-
-# Reiniciar tudo (não relê o .env por si só — "up -d" detecta e aplica mudanças; "restart" não)
-docker compose restart
-
-# Parar tudo (mantém os dados do Postgres, guardados no volume db_data)
-docker compose down
-
-# Apagar tudo, incluindo o banco de dados — IRREVERSÍVEL, use só se realmente quiser zerar os dados
-docker compose down -v
-
-# Backup do banco
-docker compose exec db pg_dump -U cambia cambia > backup.sql
-
-# Restaurar um backup (com o sistema parado ou o banco vazio)
-docker compose exec -T db psql -U cambia cambia < backup.sql
-
-# Ver onde ficam os dados do volume (não remove nada)
-docker volume inspect cambia_db_data
+docker compose logs -f app              # logs em tempo real
+docker compose ps                       # status dos containers
+docker compose up -d                    # reaplica mudanças no .env (restart sozinho NÃO relê o .env)
+docker compose down                     # parar tudo (mantém os dados)
+docker compose down -v                  # apagar TUDO, incluindo o banco — irreversível
+docker compose exec db pg_dump -U cambia cambia > backup.sql        # backup
+docker compose exec -T db psql -U cambia cambia < backup.sql        # restaurar
 ```
 
-## Solução de problemas
+## Problemas comuns
 
-### Banco não acessível (`ECONNREFUSED` / `connect ETIMEDOUT` nos logs do app)
-
-Se estiver usando a **Opção A** (Postgres incluso):
-- Confirme que o container `db` está rodando e saudável: `docker compose ps` (deve mostrar `healthy`).
-- Veja os logs dele: `docker compose logs db`.
-- O container `app` **reinicia sozinho** internamente se o backend cair por não conseguir falar com o banco (verifique `docker compose logs app` por `"backend caiu — tentando de novo"`) — normalmente se resolve assim que o `db` fica saudável, sem precisar de nenhuma ação manual.
-
-Se estiver usando a **Opção B** (banco próprio):
-- Confirme que o servidor está acessível a partir de onde o Docker roda: `pg_isready -h SEU_HOST -p 5432` (rode de dentro de um container, ou da própria máquina do servidor).
-- Verifique se o Postgres aceita conexões externas (`listen_addresses` no `postgresql.conf`, e a entrada correspondente no `pg_hba.conf`).
-- Verifique regras de firewall liberando a porta usada.
-
-### Login não funciona / a sessão "some" depois de logar
-
-O navegador está rejeitando o cookie de sessão — quase sempre é um problema de HTTPS/certificado, já que o cookie exige conexão segura:
-
-- Confirme que está acessando por `https://`, não `http://`.
-- Se o `CERT_CN` não bate com o endereço que você está usando no navegador (ex: `CERT_CN=localhost` mas acessando por IP), o certificado é rejeitado de um jeito que pode até impedir o cookie de ser aceito em alguns navegadores — ajuste `CERT_CN` (ver seção própria acima) e refaça a subida.
-- Tentativas repetidas de login demais em pouco tempo acionam um limite de segurança (`429 Muitas tentativas`) — espere alguns minutos.
-
-### O link mágico não chega no e-mail
-
-- Confirme que `CAMBIA_MAIL_HABILITADO=true` e os campos `SPRING_MAIL_*` estão preenchidos corretamente no `.env` (ver "Envio real de e-mail" acima).
-- **Autenticação SMTP recusada mesmo com usuário/senha corretos**: quase sempre é o SMTP AUTH desabilitado por padrão na caixa do Microsoft 365 — veja o aviso na seção "Envio real de e-mail" acima sobre como habilitar.
-- Veja os logs da aplicação por erros de envio: `docker compose logs app | grep -i mail`.
-- Enquanto isso não estiver resolvido, o link continua disponível no log: `docker compose logs app | grep "Link mágico"`.
-
-### `docker compose ps` mostra o `app` como `unhealthy`, ou `/actuator/health` responde com status diferente de `UP`
-
-Quase sempre é `SPRING_MAIL_HOST` preenchido no `.env` sem o resto da configuração de e-mail estar completa (ex: preencheu o host mas deixou `SPRING_MAIL_PASSWORD` vazio) — a checagem de saúde do sistema tenta autenticar de verdade no servidor de e-mail configurado, mesmo com `CAMBIA_MAIL_HABILITADO=false`, e falha. Ou preencha todos os campos de "Envio real de e-mail" corretamente, ou deixe `SPRING_MAIL_HOST` em branco enquanto isso não estiver pronto.
-
-### `409 Conflict` ao tentar criar o primeiro Admin
-
-Já existe pelo menos um usuário cadastrado no banco — esse endpoint só funciona uma única vez, de propósito. Peça a um Admin já existente para criar o novo usuário pela tela "Usuários", ou confirme que não subiu por engano um banco que já tinha dados de uma instalação anterior.
-
-### `docker login` ou `docker pull` retornam `401 Unauthorized` / `denied`
-
-As credenciais fornecidas expiraram ou estão incorretas — entre em contato com quem entregou o sistema para confirmar/renovar o acesso ao registro de imagens.
-
-### Erro genérico / `500 Internal Server Error`
-
-A mensagem de erro mostrada é sempre genérica de propósito (a causa real nunca é exposta ao navegador, por segurança) — a causa completa fica só no log da aplicação: `docker compose logs app`. Se precisar de ajuda, inclua esse trecho do log ao contatar o suporte.
-
----
+| Sintoma | Causa provável / o que fazer |
+|---|---|
+| `app` fica `unhealthy` ou `/actuator/health` não retorna `UP` | `SPRING_MAIL_HOST` preenchido sem o resto do e-mail configurado — o healthcheck tenta autenticar de verdade. Preencha tudo (seção "E-mail") ou deixe `SPRING_MAIL_HOST` em branco. |
+| Banco não acessível (`ECONNREFUSED`/`ETIMEDOUT`) | Verifique `docker compose ps` (deve mostrar `db` `healthy`); com banco externo, teste `pg_isready -h SEU_HOST -p 5432` e confira firewall/`pg_hba.conf`. |
+| Login não funciona / sessão some | Acesse por `https://`, não `http://`; confirme que `CERT_CN` bate com o endereço usado no navegador. |
+| `429 Muitas tentativas` | Limite de tentativas de login — espere alguns minutos. |
+| Link mágico não chega | Confira `SPRING_MAIL_*` no `.env`; SMTP recusando autenticação quase sempre é o SMTP AUTH desligado no M365 (ver seção "E-mail"); enquanto isso, use `docker compose logs app \| grep "Link mágico"`. |
+| `409 Conflict` ao criar o primeiro Admin | Já existe usuário no banco — crie novos pela tela "Usuários". |
+| `401`/`denied` no `docker login`/`pull` | Credenciais expiradas/incorretas — peça a quem entregou o sistema. |
+| `500 Internal Server Error` genérico | Mensagem é sempre genérica de propósito; veja a causa real em `docker compose logs app`. |
 
 ## Histórico de versões
 
-| Versão | Tag Docker | Data | Destaques |
-|---|---|---|---|
-| v1.0.0 | `:latest` `:1.0.0` | 2026-09-03 | Primeiro release oficial — cadastros (Clientes/Bancos/Usuários), Operações de câmbio com cálculo automático completo, Fechamento Diário com exportação em PDF/Excel, Relatórios e histórico de auditoria. Empacotado como imagem única (backend + front-end + HTTPS). |
-
-## Limitações conhecidas
-
-- **Certificado HTTPS autoassinado por padrão** — funciona (o tráfego é criptografado de verdade), mas o navegador mostra um aviso na primeira visita. Ver seção de certificado acima para detalhes e como trocar por um real.
-- **Senha do Postgres definida por você** (`POSTGRES_PASSWORD`) — use uma senha forte; a porta `5432` fica publicada no host por padrão.
-- **Sem rotina automatizada de backup do banco** — use o comando manual de `pg_dump` citado acima, agendado externamente (ex: `cron`).
-
-## Notas
-
-- **Dados**: ficam no PostgreSQL que você gerencia (volume `db_data`, se estiver usando a Opção A). O container `app` é stateless, exceto pelo volume do certificado (`app_certs`).
-- **Segredos**: nunca compartilhe o `.env`. Trate `POSTGRES_PASSWORD`, a senha do Microsoft 365 e o token de acesso ao registro de imagens como senhas.
+| Versão | Data | Destaques |
+|---|---|---|
+| v1.0.0 | 2026-09-03 | Primeiro release — cadastros, operações de câmbio com cálculo automático, fechamento diário (PDF/Excel), relatórios, auditoria. Empacotado como imagem única. |
 
 ## Suporte
 
-Em caso de dúvida na instalação, erro inesperado, ou para solicitar credenciais/uma nova versão, entre em contato com quem entregou o sistema.
+Dúvidas na instalação, erros, ou para solicitar credenciais/nova versão: entre em contato com quem entregou o sistema.
