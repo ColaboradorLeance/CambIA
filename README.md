@@ -175,6 +175,7 @@ frontend/src/                Front-end (React + Vite)
 reverse-proxy/                Reverse proxy HTTPS (Nginx) — único ponto de entrada exposto no host
 docs/                        Documentação de domínio, decisões, pendências e roadmap (ver abaixo)
 docker-compose.yml           Orquestração dos containers para rodar o sistema completo
+scripts/release.sh           Corta uma nova versão e publica as imagens (ver RELEASING.md)
 ```
 
 ## Documentação do projeto
@@ -183,6 +184,7 @@ docker-compose.yml           Orquestração dos containers para rodar o sistema 
 - [docs/decisoes.md](docs/decisoes.md) — decisões arquiteturais e de produto já fechadas, incremento a incremento
 - [docs/pendencias.md](docs/pendencias.md) — decisões de negócio ainda em aberto
 - [docs/roadmap.md](docs/roadmap.md) — o que já foi entregue e o que falta
+- [RELEASING.md](RELEASING.md) — como versionar e publicar uma imagem Docker para entregar a um cliente
 
 ## Limitações conhecidas antes de um uso em produção "real"
 
