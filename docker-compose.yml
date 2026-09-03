@@ -7,7 +7,7 @@ services:
       # Achado de revisão de segurança: senha vinha fixa ("cambia") direto no compose.
       # Continua com esse valor por padrão (não quebra o ambiente de dev de quem já usa),
       # mas agora é configurável — defina POSTGRES_PASSWORD no .env com uma senha forte
-      # antes de expor a porta 5432 além do localhost. Ver README.md.
+      # antes de expor a porta 5432 além do localhost. Ver DEVELOPMENT.md.
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cambia}
     volumes:
       - db_data:/var/lib/postgresql/data
@@ -61,7 +61,7 @@ services:
         # reverse-proxy (Fase 3A), front-end e backend viram a MESMA origem — path
         # relativo (vazio) funciona e é o padrão agora. Só defina VITE_API_URL no .env
         # se estiver rodando SEM o reverse-proxy (ex: acessando o backend direto numa
-        # porta própria) — ver README.md.
+        # porta própria) — ver DEVELOPMENT.md.
         VITE_API_URL: ${VITE_API_URL:-}
     # Achado de revisão de segurança (Fase 3A): idem ao backend — não publica mais
     # porta direto no host, só alcançável via reverse-proxy.

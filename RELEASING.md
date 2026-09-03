@@ -80,3 +80,7 @@ primeira publicação, configurar o acesso do cliente ao pacote:
 usuário/organização do cliente como colaborador com permissão de leitura — ou gerar um
 Personal Access Token com escopo `read:packages` só pra esse fim e repassar ao cliente
 junto com as instruções de `docker login ghcr.io`.
+
+O guia de instalação/configuração que o cliente usa a partir daí é o
+[README.md](README.md) — já pronto pra copiar/colar (`docker-compose.yml` e `.env` de
+exemplo inclusos), sem depender de nenhum arquivo deste repositório além dele mesmo.
