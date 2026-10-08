@@ -116,13 +116,26 @@ class OperacaoFundoTests {
 	}
 
 	@Test
-	void virtualAceitaQualquerLetraEPreservaComoVeio() throws Exception {
+	void virtualAceitaQualquerLetraENormalizaPraMaiuscula() throws Exception {
+		// Incremento 77 (pendência #15): a letra é guardada SEMPRE em maiúscula — "z" e
+		// "Z" são o mesmo fundo, e os filtros das telas (match exato) não podem vê-los
+		// como dois valores distintos.
 		mockMvc.perform(post("/operacoes")
 						.header("Authorization", authHeader)
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(operacaoJson("Virtual", "z")))
 				.andExpect(status().isCreated())
-				.andExpect(jsonPath("$.fundo").value("z"));
+				.andExpect(jsonPath("$.fundo").value("Z"));
+	}
+
+	@Test
+	void prontoComPMinusculoEhAceitoENormalizado() throws Exception {
+		mockMvc.perform(post("/operacoes")
+						.header("Authorization", authHeader)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(operacaoJson("Pronto", "p")))
+				.andExpect(status().isCreated())
+				.andExpect(jsonPath("$.fundo").value("P"));
 	}
 
 	@Test
@@ -164,10 +177,12 @@ class OperacaoFundoTests {
 						.content(operacaoJson("Credito", "M")))
 				.andReturn().getResponse().getHeader("Location");
 
+		// Letra minúscula na EDIÇÃO também é normalizada pra maiúscula (Incremento 77) —
+		// cobre o caminho do PUT, que usa os mesmos validadores da criação.
 		mockMvc.perform(put(location)
 						.header("Authorization", authHeader)
 						.contentType(MediaType.APPLICATION_JSON)
-						.content(operacaoJson("Credito", "W")))
+						.content(operacaoJson("Credito", "w")))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.fundo").value("W"));
 

@@ -37,8 +37,7 @@ class RelatorioRankingService {
 		// Fechamento): desde o Incremento 76 toResponse calcula em qualquer status, então
 		// os calculados das não confirmadas são zerados aqui — a ordem continua aparecendo
 		// no agrupamento (ex: quem criou e ainda não completou figura com comissão 0).
-		List<OperacaoResponse> respostas = operacoes.stream()
-				.map(operacaoService::toResponse)
+		List<OperacaoResponse> respostas = operacaoService.toResponses(operacoes).stream()
 				.map(r -> r.status() == StatusOperacao.CONFIRMADO ? r : r.semValoresCalculados())
 				.toList();
 

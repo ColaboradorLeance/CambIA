@@ -58,7 +58,7 @@ class FechamentoService {
 	}
 
 	private List<OperacaoResponse> operacoesDoDia(LocalDate data) {
-		return operacaoRepository.findByData(data).stream().map(operacaoService::toResponse).toList();
+		return operacaoService.toResponses(operacaoRepository.findByData(data));
 	}
 
 	private ResumoOperacional calcularResumo(List<OperacaoResponse> respostas) {

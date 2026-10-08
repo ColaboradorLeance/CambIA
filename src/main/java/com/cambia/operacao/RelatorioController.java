@@ -88,12 +88,8 @@ class RelatorioController {
 			@RequestParam(required = false) StatusOperacao status,
 			@RequestParam(required = false) Long criadoPorUsuarioId,
 			@RequestParam(required = false) Long completadoPorUsuarioId) {
-		return service
-				.relatorioOperacoes(periodo, clienteId, bancoId, moeda, cv, status, criadoPorUsuarioId,
-						completadoPorUsuarioId, LocalDate.now())
-				.stream()
-				.map(service::toResponse)
-				.toList();
+		return service.toResponses(service.relatorioOperacoes(periodo, clienteId, bancoId, moeda, cv, status,
+				criadoPorUsuarioId, completadoPorUsuarioId, LocalDate.now()));
 	}
 
 }

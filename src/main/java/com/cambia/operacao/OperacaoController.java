@@ -54,7 +54,7 @@ class OperacaoController {
 
 	@GetMapping
 	List<OperacaoResponse> listar() {
-		return service.listar().stream().map(service::toResponse).toList();
+		return service.toResponses(service.listar());
 	}
 
 	@PatchMapping("/{id}/status")

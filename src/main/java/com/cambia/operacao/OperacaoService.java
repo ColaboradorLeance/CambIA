@@ -3,10 +3,15 @@ package com.cambia.operacao;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 import com.cambia.banco.BancoRepository;
+import com.cambia.banco.BancoResumo;
 import com.cambia.cliente.ClienteRepository;
+import com.cambia.cliente.ClienteResumo;
 import com.cambia.usuario.UsuarioRepository;
 
 import org.springframework.http.HttpStatus;
@@ -39,16 +44,17 @@ class OperacaoService {
 		if (!bancoRepository.existsById(request.bancoId())) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Banco informado não existe");
 		}
-		validarSpreadEmissao(request.prCrVir(), request.spreadEmissao());
-		validarFundo(request.prCrVir(), request.fundo());
-		String codigoOperacao = validarCodigoOperacao(request.prCrVir(), request.codigoOperacao());
-		validarSpotAsset(request.prCrVir(), request.spotAsset());
+		String prCrVir = validarPrCrVir(request.prCrVir());
+		validarSpreadEmissao(prCrVir, request.spreadEmissao());
+		String fundo = validarFundo(prCrVir, request.fundo());
+		String codigoOperacao = validarCodigoOperacao(prCrVir, request.codigoOperacao());
+		validarSpotAsset(prCrVir, request.spotAsset());
 
 		String idTrade = gerarIdTrade(request.data().getYear());
 		Instant agora = Instant.now();
 
 		Operacao operacao = new Operacao(idTrade, request.data(), request.codigoBanco(), codigoOperacao,
-				request.clienteId(), request.bancoId(), request.cv(), request.prCrVir(), request.fundo(),
+				request.clienteId(), request.bancoId(), request.cv(), prCrVir, fundo,
 				request.spreadEmissao(), request.moeda(), request.valorMe(), request.spotAsset(),
 				request.nivelamento(), request.taxaFinal(), criadoPorUsuarioId, agora);
 		operacao = repository.save(operacao);
@@ -69,21 +75,42 @@ class OperacaoService {
 		if (!bancoRepository.existsById(request.bancoId())) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Banco informado não existe");
 		}
-		validarSpreadEmissao(request.prCrVir(), request.spreadEmissao());
-		validarFundo(request.prCrVir(), request.fundo());
-		String codigoOperacao = validarCodigoOperacao(request.prCrVir(), request.codigoOperacao());
-		validarSpotAsset(request.prCrVir(), request.spotAsset());
+		String prCrVir = validarPrCrVir(request.prCrVir());
+		validarSpreadEmissao(prCrVir, request.spreadEmissao());
+		String fundo = validarFundo(prCrVir, request.fundo());
+		String codigoOperacao = validarCodigoOperacao(prCrVir, request.codigoOperacao());
+		validarSpotAsset(prCrVir, request.spotAsset());
 
 		OperacaoSnapshot dadosAnteriores = OperacaoSnapshot.de(operacao, nomeCliente(operacao.getClienteId()),
 				nomeBanco(operacao.getBancoId()));
 		operacao.editar(request.codigoBanco(), codigoOperacao, request.clienteId(), request.bancoId(), request.cv(),
-				request.prCrVir(), request.fundo(), request.spreadEmissao(), request.moeda(), request.valorMe(),
+				prCrVir, fundo, request.spreadEmissao(), request.moeda(), request.valorMe(),
 				request.spotAsset(), request.nivelamento(), request.taxaFinal());
 		operacao = repository.save(operacao);
 
 		eventoService.registrar(TipoEventoOperacao.EDITADA, operacao.getId(), usuarioId, Instant.now(),
 				dadosAnteriores);
 		return operacao;
+	}
+
+	// Incremento 77 (pendência #16, achado da revisão de 2026-10-08): PR/CR/VIR deixou de
+	// ser texto livre — domínio fechado em Pronto/Credito/Virtual. Variações de caixa e
+	// acento são aceitas e NORMALIZADAS pro canônico (sem acento, a grafia que todo o
+	// resto do sistema já comparava); fora disso, 400. Motivo: "Crédito" com acento
+	// passava por fora das obrigatoriedades de Crédito (Código da operação/Spot Asset)
+	// e calculava Custo 0. As demais validações recebem o valor JÁ normalizado.
+	private String validarPrCrVir(String prCrVir) {
+		if (prCrVir != null) {
+			String semAcento = java.text.Normalizer.normalize(prCrVir, java.text.Normalizer.Form.NFD)
+					.replaceAll("\\p{M}", "");
+			for (String canonico : List.of("Pronto", "Credito", "Virtual")) {
+				if (canonico.equalsIgnoreCase(semAcento)) {
+					return canonico;
+				}
+			}
+		}
+		throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+				"Tipo da ordem (PR/CR/VIR) deve ser Pronto, Crédito ou Virtual");
 	}
 
 	// Achado de negócio (Incremento 56): Spread emissão não é calculado — vem no próprio
@@ -93,7 +120,7 @@ class OperacaoService {
 	// oferece essas opções). Rejeitado com 400 quando a combinação não bate, pra não
 	// deixar dado inconsistente entrar no banco.
 	private void validarSpreadEmissao(String prCrVir, String spreadEmissao) {
-		boolean pronto = "Pronto".equalsIgnoreCase(prCrVir);
+		boolean pronto = "Pronto".equals(prCrVir); // prCrVir chega canônico (validarPrCrVir)
 		boolean valorNA = "NA".equalsIgnoreCase(spreadEmissao);
 		if (pronto && !valorNA) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
@@ -117,8 +144,11 @@ class OperacaoService {
 	// Pronto): Pronto continua exigindo "P"; qualquer outro tipo aceita QUALQUER LETRA,
 	// enviada na requisição — e por isso o valor passou a ser persistido (não é mais
 	// derivável do tipo). Continua rejeitando com 400 o que não é uma letra única.
-	private void validarFundo(String prCrVir, String fundo) {
-		boolean pronto = "Pronto".equalsIgnoreCase(prCrVir);
+	// Incremento 77 (pendência #15): devolve a letra NORMALIZADA pra maiúscula — "z" e
+	// "Z" são o mesmo fundo, e os filtros das telas (match exato) não podem vê-los como
+	// dois valores distintos. Recebe o prCrVir já canônico (validarPrCrVir).
+	private String validarFundo(String prCrVir, String fundo) {
+		boolean pronto = "Pronto".equals(prCrVir);
 		if (pronto && !"P".equalsIgnoreCase(fundo)) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
 					"Fundo deve ser \"P\" quando o tipo da ordem é Pronto");
@@ -127,6 +157,7 @@ class OperacaoService {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
 					"Fundo deve ser uma única letra quando o tipo da ordem não é Pronto");
 		}
+		return fundo.toUpperCase(java.util.Locale.ROOT);
 	}
 
 	// Incremento 71: Código da operação é digitado na criação/edição — só números
@@ -138,7 +169,7 @@ class OperacaoService {
 	private String validarCodigoOperacao(String prCrVir, String codigoOperacao) {
 		String valor = codigoOperacao == null || codigoOperacao.isBlank() ? null : codigoOperacao.trim();
 		if (valor == null) {
-			if ("Credito".equalsIgnoreCase(prCrVir)) {
+			if ("Credito".equals(prCrVir)) { // canônico (validarPrCrVir)
 				throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
 						"Código da operação é obrigatório quando o tipo da ordem é Crédito");
 			}
@@ -162,7 +193,7 @@ class OperacaoService {
 	// opcional nos demais. Positivo/4 casas continuam garantidos pelas anotações do
 	// request quando o valor vem preenchido.
 	private void validarSpotAsset(String prCrVir, BigDecimal spotAsset) {
-		if (spotAsset == null && "Credito".equalsIgnoreCase(prCrVir)) {
+		if (spotAsset == null && "Credito".equals(prCrVir)) { // canônico (validarPrCrVir)
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
 					"Spot Asset é obrigatório quando o tipo da ordem é Crédito");
 		}
@@ -218,39 +249,53 @@ class OperacaoService {
 	}
 
 	OperacaoResponse toResponse(Operacao operacao) {
-		String criadoPorNome = usuarioRepository.findById(operacao.getCriadoPorUsuarioId())
-				.map(u -> u.getNome())
-				.orElse(null);
-		String completadoPorNome = operacao.getCompletadoPorUsuarioId() == null ? null
-				: usuarioRepository.findById(operacao.getCompletadoPorUsuarioId())
-						.map(u -> u.getNome())
-						.orElse(null);
-		String clienteNome = nomeCliente(operacao.getClienteId());
-		String clienteDocumento = documentoCliente(operacao.getClienteId());
-		String bancoNome = nomeBanco(operacao.getBancoId());
+		return toResponses(List.of(operacao)).get(0);
+	}
 
-		// Incremento 76 (substitui a regra do Incremento 39, que suprimia os valores fora
-		// de CONFIRMADO): os valores calculados existem SEMPRE, em qualquer status —
-		// pedido do usuário ("calcular e exibir sempre, inclusive em andamento"). Em
-		// andamento eles são uma prévia que acompanha as edições; confirmar continua
-		// travando a ordem (e com ela os valores).
-		String formulaComissao = bancoRepository.findCalculoFormulaById(operacao.getBancoId())
-				.orElse(null);
-		BigDecimal taxaRebate = bancoRepository.findTaxaRebateById(operacao.getBancoId())
-				.orElse(null);
-		ValoresCalculados valores = OperacaoCalculo.calcular(operacao.getValorMe(), operacao.getSpotAsset(),
-				operacao.getNivelamento(), operacao.getTaxaFinal(), operacao.getCv(), operacao.getPrCrVir(),
-				operacao.getSpreadEmissao(), formulaComissao, taxaRebate);
-		return OperacaoResponse.from(operacao, valores, criadoPorNome, completadoPorNome, clienteNome,
-				clienteDocumento, bancoNome);
+	/**
+	 * Versão pra listas: as listagens mapeavam linha a linha pelo toResponse e repetiam
+	 * as mesmas consultas de nome/fórmula pra cada ordem (~6 queries por linha — achado
+	 * de eficiência da revisão de 2026-10-08). Aqui cada usuário/cliente/banco DISTINTO
+	 * é consultado uma única vez por chamada — memoização local, sem cache global, então
+	 * nunca serve dado velho entre requisições.
+	 */
+	List<OperacaoResponse> toResponses(List<Operacao> operacoes) {
+		Map<Long, Optional<String>> nomesUsuario = new HashMap<>();
+		Map<Long, Optional<ClienteResumo>> clientes = new HashMap<>();
+		Map<Long, Optional<BancoResumo>> bancos = new HashMap<>();
+
+		return operacoes.stream().map(operacao -> {
+			String criadoPorNome = nomesUsuario
+					.computeIfAbsent(operacao.getCriadoPorUsuarioId(),
+							id -> usuarioRepository.findById(id).map(u -> u.getNome()))
+					.orElse(null);
+			String completadoPorNome = operacao.getCompletadoPorUsuarioId() == null ? null
+					: nomesUsuario
+							.computeIfAbsent(operacao.getCompletadoPorUsuarioId(),
+									id -> usuarioRepository.findById(id).map(u -> u.getNome()))
+							.orElse(null);
+			Optional<ClienteResumo> cliente = clientes
+					.computeIfAbsent(operacao.getClienteId(), clienteRepository::findResumoById);
+			Optional<BancoResumo> banco = bancos
+					.computeIfAbsent(operacao.getBancoId(), bancoRepository::findResumoById);
+
+			// Incremento 76 (substitui a regra do Incremento 39, que suprimia os valores
+			// fora de CONFIRMADO): os valores calculados existem SEMPRE, em qualquer
+			// status — pedido do usuário ("calcular e exibir sempre, inclusive em
+			// andamento"). Em andamento eles são uma prévia que acompanha as edições;
+			// confirmar continua travando a ordem (e com ela os valores).
+			ValoresCalculados valores = OperacaoCalculo.calcular(operacao.getValorMe(), operacao.getSpotAsset(),
+					operacao.getNivelamento(), operacao.getTaxaFinal(), operacao.getCv(), operacao.getPrCrVir(),
+					operacao.getSpreadEmissao(), banco.map(BancoResumo::formula).orElse(null),
+					banco.map(BancoResumo::taxaRebate).orElse(null));
+			return OperacaoResponse.from(operacao, valores, criadoPorNome, completadoPorNome,
+					cliente.map(ClienteResumo::nome).orElse(null), cliente.map(ClienteResumo::documento).orElse(null),
+					banco.map(BancoResumo::nome).orElse(null));
+		}).toList();
 	}
 
 	private String nomeCliente(Long clienteId) {
 		return clienteRepository.findNomeById(clienteId).orElse(null);
-	}
-
-	private String documentoCliente(Long clienteId) {
-		return clienteRepository.findDocumentoById(clienteId).orElse(null);
 	}
 
 	private String nomeBanco(Long bancoId) {
