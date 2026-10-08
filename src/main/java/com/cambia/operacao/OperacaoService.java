@@ -41,14 +41,16 @@ class OperacaoService {
 		}
 		validarSpreadEmissao(request.prCrVir(), request.spreadEmissao());
 		validarFundo(request.prCrVir(), request.fundo());
+		String codigoOperacao = validarCodigoOperacao(request.prCrVir(), request.codigoOperacao());
+		validarSpotAsset(request.prCrVir(), request.spotAsset());
 
 		String idTrade = gerarIdTrade(request.data().getYear());
 		Instant agora = Instant.now();
 
-		Operacao operacao = new Operacao(idTrade, request.data(), request.codigoBanco(), request.clienteId(),
-				request.bancoId(), request.cv(), request.prCrVir(), request.spreadEmissao(), request.moeda(),
-				request.valorMe(), request.spotAsset(), request.nivelamento(), request.taxaFinal(),
-				criadoPorUsuarioId, agora);
+		Operacao operacao = new Operacao(idTrade, request.data(), request.codigoBanco(), codigoOperacao,
+				request.clienteId(), request.bancoId(), request.cv(), request.prCrVir(), request.fundo(),
+				request.spreadEmissao(), request.moeda(), request.valorMe(), request.spotAsset(),
+				request.nivelamento(), request.taxaFinal(), criadoPorUsuarioId, agora);
 		operacao = repository.save(operacao);
 
 		eventoService.registrar(TipoEventoOperacao.CRIADA, operacao.getId(), criadoPorUsuarioId, agora,
@@ -69,12 +71,14 @@ class OperacaoService {
 		}
 		validarSpreadEmissao(request.prCrVir(), request.spreadEmissao());
 		validarFundo(request.prCrVir(), request.fundo());
+		String codigoOperacao = validarCodigoOperacao(request.prCrVir(), request.codigoOperacao());
+		validarSpotAsset(request.prCrVir(), request.spotAsset());
 
 		OperacaoSnapshot dadosAnteriores = OperacaoSnapshot.de(operacao, nomeCliente(operacao.getClienteId()),
 				nomeBanco(operacao.getBancoId()));
-		operacao.editar(request.codigoBanco(), request.clienteId(), request.bancoId(), request.cv(),
-				request.prCrVir(), request.spreadEmissao(), request.moeda(), request.valorMe(), request.spotAsset(),
-				request.nivelamento(), request.taxaFinal());
+		operacao.editar(request.codigoBanco(), codigoOperacao, request.clienteId(), request.bancoId(), request.cv(),
+				request.prCrVir(), request.fundo(), request.spreadEmissao(), request.moeda(), request.valorMe(),
+				request.spotAsset(), request.nivelamento(), request.taxaFinal());
 		operacao = repository.save(operacao);
 
 		eventoService.registrar(TipoEventoOperacao.EDITADA, operacao.getId(), usuarioId, Instant.now(),
@@ -109,20 +113,58 @@ class OperacaoService {
 		}
 	}
 
-	// Achado de negócio (Incremento 70): Fundo não é um campo independente — é sempre
-	// derivado do tipo da ordem (PR/CR/VIR): "P" quando é "Pronto", "M" nos demais
-	// (Crédito/Virtual). Mesmo assim, precisa vir explícito no request e bater com essa
-	// derivação (rejeitado com 400 quando não bate) — pedido do usuário pra forçar quem
-	// manda a ordem (tela ou API) a confirmar o valor certo, mesmo padrão de validação já
-	// usado pra Spread emissão acima. Não é persistido: como o valor é 100% derivável do
-	// tipo, guardar uma segunda cópia seria dado redundante.
+	// Incremento 75 (substitui a regra do Incremento 70, que exigia "M" fixo fora de
+	// Pronto): Pronto continua exigindo "P"; qualquer outro tipo aceita QUALQUER LETRA,
+	// enviada na requisição — e por isso o valor passou a ser persistido (não é mais
+	// derivável do tipo). Continua rejeitando com 400 o que não é uma letra única.
 	private void validarFundo(String prCrVir, String fundo) {
 		boolean pronto = "Pronto".equalsIgnoreCase(prCrVir);
-		String esperado = pronto ? "P" : "M";
-		if (!esperado.equalsIgnoreCase(fundo)) {
+		if (pronto && !"P".equalsIgnoreCase(fundo)) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-					pronto ? "Fundo deve ser \"P\" quando o tipo da ordem é Pronto"
-							: "Fundo deve ser \"M\" quando o tipo da ordem não é Pronto");
+					"Fundo deve ser \"P\" quando o tipo da ordem é Pronto");
+		}
+		if (!pronto && (fundo == null || !fundo.matches("[A-Za-z]"))) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+					"Fundo deve ser uma única letra quando o tipo da ordem não é Pronto");
+		}
+	}
+
+	// Incremento 71: Código da operação é digitado na criação/edição — só números
+	// (guardado como texto, preservando zeros à esquerda). Obrigatório quando o tipo da
+	// ordem (PR/CR/VIR) é "Crédito"; opcional nos demais — pedido do usuário ("código da
+	// operação = tipo crédito"). Mesmo padrão de validação condicional do Spread emissão
+	// e do Fundo acima. Em branco conta como ausente; devolve o valor normalizado (sem
+	// espaços nas pontas, ou null).
+	private String validarCodigoOperacao(String prCrVir, String codigoOperacao) {
+		String valor = codigoOperacao == null || codigoOperacao.isBlank() ? null : codigoOperacao.trim();
+		if (valor == null) {
+			if ("Credito".equalsIgnoreCase(prCrVir)) {
+				throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+						"Código da operação é obrigatório quando o tipo da ordem é Crédito");
+			}
+			return null;
+		}
+		if (!valor.matches("\\d+")) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Código da operação só aceita números");
+		}
+		// Limite técnico da coluna (VARCHAR(20), migração V20): sem este teto, um código
+		// maior estourava no INSERT e virava 500 em vez de um 400 explicável.
+		if (valor.length() > 20) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+					"Código da operação pode ter no máximo 20 dígitos");
+		}
+		return valor;
+	}
+
+	// Incremento 72: Spot Asset saiu da tela de Registrar Operação — entra somente via
+	// API (pedido do usuário). Obrigatório só quando o tipo da ordem é "Crédito", único
+	// caso em que entra numa fórmula confirmada (Custo = Spot Asset / Taxa Final − 1);
+	// opcional nos demais. Positivo/4 casas continuam garantidos pelas anotações do
+	// request quando o valor vem preenchido.
+	private void validarSpotAsset(String prCrVir, BigDecimal spotAsset) {
+		if (spotAsset == null && "Credito".equalsIgnoreCase(prCrVir)) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+					"Spot Asset é obrigatório quando o tipo da ordem é Crédito");
 		}
 	}
 
@@ -187,11 +229,11 @@ class OperacaoService {
 		String clienteDocumento = documentoCliente(operacao.getClienteId());
 		String bancoNome = nomeBanco(operacao.getBancoId());
 
-		if (operacao.getStatus() != StatusOperacao.CONFIRMADO) {
-			return OperacaoResponse.from(operacao,
-					new ValoresCalculados(null, null, null, null, null, null, null, null), criadoPorNome,
-					completadoPorNome, clienteNome, clienteDocumento, bancoNome);
-		}
+		// Incremento 76 (substitui a regra do Incremento 39, que suprimia os valores fora
+		// de CONFIRMADO): os valores calculados existem SEMPRE, em qualquer status —
+		// pedido do usuário ("calcular e exibir sempre, inclusive em andamento"). Em
+		// andamento eles são uma prévia que acompanha as edições; confirmar continua
+		// travando a ordem (e com ela os valores).
 		String formulaComissao = bancoRepository.findCalculoFormulaById(operacao.getBancoId())
 				.orElse(null);
 		BigDecimal taxaRebate = bancoRepository.findTaxaRebateById(operacao.getBancoId())

@@ -42,7 +42,18 @@ async function request(path, options = {}) {
 		headers["Authorization"] = `Bearer ${token}`;
 	}
 
-	const response = await fetch(`${API_URL}${path}`, { ...options, headers, credentials: "include" });
+	// Falha de REDE (servidor fora do ar/reiniciando, conexão recusada) não passa pelos
+	// tratamentos de status abaixo — o fetch rejeita antes de existir resposta. Sem este
+	// catch, nenhum pop-up aparecia, e telas como o Painel mandavam o usuário "ver o
+	// pop-up de erro" que nunca existiu (visto ao vivo durante um redeploy).
+	let response;
+	try {
+		response = await fetch(`${API_URL}${path}`, { ...options, headers, credentials: "include" });
+	} catch {
+		const mensagem = "Não foi possível conectar ao servidor. Verifique se o sistema está no ar e tente novamente.";
+		mostrarErroGlobal(mensagem);
+		throw new Error(mensagem);
+	}
 
 	if (response.status === 401) {
 		const mensagem = "Sessão expirada ou inválida. Faça login novamente.";
@@ -73,7 +84,15 @@ async function baixarArquivo(path, nomeArquivo) {
 		headers["Authorization"] = `Bearer ${token}`;
 	}
 
-	const response = await fetch(`${API_URL}${path}`, { headers, credentials: "include" });
+	// Mesmo tratamento de falha de rede do request() acima.
+	let response;
+	try {
+		response = await fetch(`${API_URL}${path}`, { headers, credentials: "include" });
+	} catch {
+		const mensagem = "Não foi possível conectar ao servidor. Verifique se o sistema está no ar e tente novamente.";
+		mostrarErroGlobal(mensagem);
+		throw new Error(mensagem);
+	}
 
 	if (response.status === 401) {
 		const mensagem = "Sessão expirada ou inválida. Faça login novamente.";

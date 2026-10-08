@@ -17,24 +17,24 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Achado de negócio (Incremento 56): Spread emissão não é calculado — vem no próprio
- * request de criação/edição, e precisa ser consistente com PR/CR/VIR: "NA" quando é
- * "Pronto" (único tipo que a tela de Registrar Operação consegue criar); um número com
- * o tipo da ordem não sendo "Pronto" (Crédito/Virtual, só alcançáveis via API). Sem campo
- * nenhum na tela — a UI sempre manda "NA" por baixo dos panos, já que só cria operações
- * "Pronto" (ver frontend/src/pages/OperacoesPage.jsx).
+ * Incremento 75: Fundo deixou de ser 100% derivado do tipo da ordem (regra anterior,
+ * Incremento 70: "P" pra Pronto, "M" pros demais, rejeitado se não batesse). Regra nova
+ * (pedido do usuário): Pronto continua exigindo "P"; qualquer outro tipo aceita QUALQUER
+ * LETRA, enviada na requisição. Com isso o valor não é mais derivável e passou a ser
+ * persistido e devolvido pela API (campo {@code fundo} no response).
  */
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
-class OperacaoSpreadEmissaoTests {
+class OperacaoFundoTests {
 
 	@Autowired
 	private MockMvc mockMvc;
@@ -57,30 +57,28 @@ class OperacaoSpreadEmissaoTests {
 		String clienteBody = mockMvc.perform(post("/clientes")
 						.header("Authorization", authHeader)
 						.contentType(MediaType.APPLICATION_JSON)
-						.content("{\"nome\":\"Cliente Spread Emissao\",\"documento\":\"11.111.111/0001-11\"}"))
+						.content("{\"nome\":\"Cliente Fundo\",\"documento\":\"44.444.444/0001-44\"}"))
 				.andReturn().getResponse().getContentAsString();
 		clienteId = ((Number) JsonPath.read(clienteBody, "$.id")).longValue();
 
 		String calculoBody = mockMvc.perform(post("/calculos")
 						.header("Authorization", authHeader)
 						.contentType(MediaType.APPLICATION_JSON)
-						.content("{\"nome\":\"Modelo Spread Emissao\",\"formula\":\"N*50%\"}"))
+						.content("{\"nome\":\"Modelo Fundo\",\"formula\":\"N*50%\"}"))
 				.andReturn().getResponse().getContentAsString();
 		Long calculoId = ((Number) JsonPath.read(calculoBody, "$.id")).longValue();
 
 		String bancoBody = mockMvc.perform(post("/bancos")
 						.header("Authorization", authHeader)
 						.contentType(MediaType.APPLICATION_JSON)
-						.content("{\"codigoBanco\":\"998\",\"sigla\":\"SE\",\"nome\":\"SE\",\"taxaRebate\":0,\"calculoId\":%d}"
+						.content("{\"codigoBanco\":\"995\",\"sigla\":\"FU\",\"nome\":\"FU\",\"taxaRebate\":0,\"calculoId\":%d}"
 								.formatted(calculoId)))
 				.andReturn().getResponse().getContentAsString();
 		bancoId = ((Number) JsonPath.read(bancoBody, "$.id")).longValue();
 	}
 
-	private String operacaoJson(String prCrVir, String spreadEmissao) {
-		String fundo = "Pronto".equalsIgnoreCase(prCrVir) ? "P" : "M";
-		// codigoOperacao sempre presente: obrigatório pra Crédito (Incremento 71) e
-		// aceito pra qualquer tipo — mantém este teste focado só no Spread emissão.
+	private String operacaoJson(String prCrVir, String fundo) {
+		String spreadEmissao = "Pronto".equalsIgnoreCase(prCrVir) ? "NA" : "0.020";
 		return """
 				{"data":"2026-09-01","clienteId":%d,"bancoId":%d,"cv":"V","prCrVir":"%s","fundo":"%s","spreadEmissao":"%s",
 				"codigoOperacao":"555","moeda":"USD","valorMe":1000,"spotAsset":5.10,"nivelamento":5.10,"taxaFinal":5.00}
@@ -88,87 +86,96 @@ class OperacaoSpreadEmissaoTests {
 	}
 
 	@Test
-	void prontoComNaEhAceito() throws Exception {
+	void prontoComPEhAceitoEDevolvido() throws Exception {
 		mockMvc.perform(post("/operacoes")
 						.header("Authorization", authHeader)
 						.contentType(MediaType.APPLICATION_JSON)
-						.content(operacaoJson("Pronto", "NA")))
+						.content(operacaoJson("Pronto", "P")))
 				.andExpect(status().isCreated())
-				.andExpect(jsonPath("$.spreadEmissao").value("NA"));
+				.andExpect(jsonPath("$.fundo").value("P"));
 	}
 
 	@Test
-	void prontoComNumeroEhRejeitado() throws Exception {
+	void prontoComOutraLetraEhRejeitado() throws Exception {
 		mockMvc.perform(post("/operacoes")
 						.header("Authorization", authHeader)
 						.contentType(MediaType.APPLICATION_JSON)
-						.content(operacaoJson("Pronto", "0.020")))
+						.content(operacaoJson("Pronto", "X")))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.detail", org.hamcrest.Matchers.containsString("Pronto")));
 	}
 
 	@Test
-	void creditoComNumeroEhAceito() throws Exception {
+	void creditoAceitaQualquerLetra() throws Exception {
 		mockMvc.perform(post("/operacoes")
 						.header("Authorization", authHeader)
 						.contentType(MediaType.APPLICATION_JSON)
-						.content(operacaoJson("Credito", "0.020")))
+						.content(operacaoJson("Credito", "X")))
 				.andExpect(status().isCreated())
-				.andExpect(jsonPath("$.spreadEmissao").value("0.020"));
+				.andExpect(jsonPath("$.fundo").value("X"));
 	}
 
 	@Test
-	void virtualComNaEhRejeitado() throws Exception {
+	void virtualAceitaQualquerLetraEPreservaComoVeio() throws Exception {
 		mockMvc.perform(post("/operacoes")
 						.header("Authorization", authHeader)
 						.contentType(MediaType.APPLICATION_JSON)
-						.content(operacaoJson("Virtual", "NA")))
+						.content(operacaoJson("Virtual", "z")))
+				.andExpect(status().isCreated())
+				.andExpect(jsonPath("$.fundo").value("z"));
+	}
+
+	@Test
+	void creditoComMaisDeUmaLetraEhRejeitado() throws Exception {
+		mockMvc.perform(post("/operacoes")
+						.header("Authorization", authHeader)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(operacaoJson("Credito", "XY")))
 				.andExpect(status().isBadRequest());
 	}
 
 	@Test
-	void virtualComTextoNaoNumericoEhRejeitado() throws Exception {
+	void creditoComCaractereNaoLetraEhRejeitado() throws Exception {
 		mockMvc.perform(post("/operacoes")
 						.header("Authorization", authHeader)
 						.contentType(MediaType.APPLICATION_JSON)
-						.content(operacaoJson("Virtual", "abc")))
+						.content(operacaoJson("Credito", "1")))
 				.andExpect(status().isBadRequest());
 	}
 
 	@Test
-	void semSpreadEmissaoEhRejeitado() throws Exception {
-		String json = """
-				{"data":"2026-09-01","clienteId":%d,"bancoId":%d,"cv":"V","prCrVir":"Pronto","fundo":"P",
-				"moeda":"USD","valorMe":1000,"spotAsset":5.10,"nivelamento":5.10,"taxaFinal":5.00}
-				""".formatted(clienteId, bancoId);
-
-		mockMvc.perform(post("/operacoes")
-						.header("Authorization", authHeader)
-						.contentType(MediaType.APPLICATION_JSON)
-						.content(json))
-				.andExpect(status().isBadRequest());
-	}
-
-	@Test
-	void edicaoTambemValidaAConsistencia() throws Exception {
+	void fundoEhPersistidoEContinuaDepoisDeBuscar() throws Exception {
 		String location = mockMvc.perform(post("/operacoes")
 						.header("Authorization", authHeader)
 						.contentType(MediaType.APPLICATION_JSON)
-						.content(operacaoJson("Pronto", "NA")))
+						.content(operacaoJson("Credito", "K")))
+				.andReturn().getResponse().getHeader("Location");
+
+		mockMvc.perform(get(location).header("Authorization", authHeader))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.fundo").value("K"));
+	}
+
+	@Test
+	void edicaoValidaETrocaOFundo() throws Exception {
+		String location = mockMvc.perform(post("/operacoes")
+						.header("Authorization", authHeader)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(operacaoJson("Credito", "M")))
 				.andReturn().getResponse().getHeader("Location");
 
 		mockMvc.perform(put(location)
 						.header("Authorization", authHeader)
 						.contentType(MediaType.APPLICATION_JSON)
-						.content(operacaoJson("Pronto", "0.020")))
-				.andExpect(status().isBadRequest());
+						.content(operacaoJson("Credito", "W")))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.fundo").value("W"));
 
 		mockMvc.perform(put(location)
 						.header("Authorization", authHeader)
 						.contentType(MediaType.APPLICATION_JSON)
-						.content(operacaoJson("Credito", "0.020")))
-				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.spreadEmissao").value("0.020"));
+						.content(operacaoJson("Pronto", "X")))
+				.andExpect(status().isBadRequest());
 	}
 
 }

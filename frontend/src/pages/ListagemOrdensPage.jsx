@@ -66,6 +66,10 @@ export default function ListagemOrdensPage() {
 	// realmente aparecem nas ordens já confirmadas, e não de uma lista fixa.
 	const moedasDisponiveis = [...new Set(confirmadas.map((op) => op.moeda).filter(Boolean))].sort();
 
+	// Fundo deixou de ter domínio fechado P/M (Incremento 75) — as opções do filtro vêm
+	// das letras que já aparecem nas ordens carregadas, mesmo critério das moedas.
+	const fundosDisponiveis = [...new Set(confirmadas.map((op) => op.fundo || calcularFundo(op.prCrVir)).filter(Boolean))].sort();
+
 	const filtradas = confirmadas.filter((op) => {
 		if (filtros.dataFechamento && dataLocalIso(op.completadoEm) !== filtros.dataFechamento) return false;
 		if (filtros.moeda && op.moeda !== filtros.moeda) return false;
@@ -76,7 +80,7 @@ export default function ListagemOrdensPage() {
 		if (filtros.cv && op.cv !== filtros.cv) return false;
 		if (filtros.tipo && (op.prCrVir || "").toLowerCase() !== filtros.tipo.toLowerCase()) return false;
 		if (!contemTexto(op.bancoNome, filtros.banco)) return false;
-		if (filtros.fundo && calcularFundo(op.prCrVir) !== filtros.fundo) return false;
+		if (filtros.fundo && (op.fundo || calcularFundo(op.prCrVir)) !== filtros.fundo) return false;
 		if (!contemTexto(op.criadoPorNome, filtros.criadoPor)) return false;
 		if (!contemTexto(op.completadoPorNome, filtros.completadoPor)) return false;
 		return true;
@@ -91,7 +95,7 @@ export default function ListagemOrdensPage() {
 
 			<div className="relatorio-filtros">
 				<label>
-					Data de fechamento
+					Data do Fechamento
 					<input
 						type="date"
 						value={filtros.dataFechamento}
@@ -110,7 +114,7 @@ export default function ListagemOrdensPage() {
 					</select>
 				</label>
 				<label>
-					Valor Moeda
+					Valor em moeda
 					<input
 						value={filtros.valorMoeda}
 						onChange={(e) => atualizarFiltro("valorMoeda", e.target.value)}
@@ -118,7 +122,7 @@ export default function ListagemOrdensPage() {
 					/>
 				</label>
 				<label>
-					CNPJ
+					CNPJ/CPF
 					<input
 						value={filtros.cnpj}
 						onChange={(e) => atualizarFiltro("cnpj", e.target.value)}
@@ -134,7 +138,7 @@ export default function ListagemOrdensPage() {
 					/>
 				</label>
 				<label>
-					ID do trade
+					Código da Ordem
 					<input
 						value={filtros.idTrade}
 						onChange={(e) => atualizarFiltro("idTrade", e.target.value)}
@@ -151,7 +155,7 @@ export default function ListagemOrdensPage() {
 					</select>
 				</label>
 				<label>
-					Tipo
+					Tipo Ordem
 					<select value={filtros.tipo} onChange={(e) => atualizarFiltro("tipo", e.target.value)}>
 						<option value="">Todos</option>
 						<option value="Pronto">Pronto</option>
@@ -171,8 +175,11 @@ export default function ListagemOrdensPage() {
 					Fundo
 					<select value={filtros.fundo} onChange={(e) => atualizarFiltro("fundo", e.target.value)}>
 						<option value="">Todos</option>
-						<option value="P">P</option>
-						<option value="M">M</option>
+						{fundosDisponiveis.map((fundo) => (
+							<option key={fundo} value={fundo}>
+								{fundo}
+							</option>
+						))}
 					</select>
 				</label>
 				<label>
@@ -212,26 +219,30 @@ export default function ListagemOrdensPage() {
 					<table>
 						<thead>
 							<tr>
-								<th>ID do trade</th>
-								<th>Data</th>
+								<th>Código da Ordem</th>
+								<th>Código Operação Origem</th>
+								<th>Data do Fechamento</th>
 								<th>Cliente</th>
-								<th>CNPJ</th>
+								<th>CNPJ/CPF</th>
 								<th>Banco</th>
 								<th>C/V</th>
-								<th>Tipo</th>
+								<th>Tipo Ordem</th>
+								<th>Valor em moeda</th>
+								<th>Spot Asset</th>
+								<th>Nivelamento</th>
+								<th>Taxa Final</th>
 								<th>Fundo</th>
 								<th>Moeda</th>
-								<th>Valor ME</th>
-								<th>R$</th>
-								<th>Total Bruto</th>
-								<th>Valor Absoluto</th>
+								<th>Valor em Real</th>
+								<th>Total Bruto Câmbio</th>
 								<th>Spread emissão</th>
 								<th>Spread liquidação</th>
 								<th>Custo</th>
 								<th>Rebate</th>
 								<th>Base de comissionamento</th>
-								<th>Comissão</th>
+								<th>Comissão Líquida</th>
 								<th>Criado por</th>
+								<th>Criado em</th>
 								<th>Completado por</th>
 								<th>Completado em</th>
 							</tr>
@@ -240,25 +251,33 @@ export default function ListagemOrdensPage() {
 							{filtradas.map((op) => (
 								<tr key={op.id}>
 									<td className="mono">{op.idTrade}</td>
+									<td className="mono">{op.codigoOperacao || "—"}</td>
 									<td>{formatarData(op.data)}</td>
 									<td>{op.clienteNome || `#${op.clienteId}`}</td>
 									<td>{op.clienteDocumento || "—"}</td>
 									<td>{op.bancoNome || `#${op.bancoId}`}</td>
 									<td>{op.cv}</td>
 									<td>{op.prCrVir}</td>
-									<td>{calcularFundo(op.prCrVir)}</td>
-									<td>{op.moeda}</td>
 									<td className="mono">{formatarMoeda(op.valorMe)}</td>
+									<td className="mono">{formatarMoeda(op.spotAsset)}</td>
+									<td className="mono">{formatarMoeda(op.nivelamento)}</td>
+									<td className="mono">{formatarMoeda(op.taxaFinal)}</td>
+									<td>{op.fundo || calcularFundo(op.prCrVir)}</td>
+									<td>{op.moeda}</td>
 									<td className="mono">{formatarMoeda(op.reais)}</td>
 									<td className="mono">{formatarMoeda(op.totalBrutoCambio)}</td>
-									<td className="mono">{formatarMoeda(op.valorAbsoluto)}</td>
 									<td className="mono">{formatarSpreadEmissao(op.spreadEmissao)}</td>
 									<td className="mono">{formatarPercentual(op.spreadLiquidacao)}</td>
-									<td className="mono">{formatarPercentual(op.custo)}</td>
+									{/* Custo só é informado quando a ordem é Crédito (pedido do usuário) — pros
+									    demais tipos a API devolve 0 fixo (Incremento 57), mas a tabela mostra "—". */}
+									<td className="mono">
+										{(op.prCrVir || "").toLowerCase() === "credito" ? formatarPercentual(op.custo) : "—"}
+									</td>
 									<td className="mono">{formatarMoeda(op.rebate)}</td>
 									<td className="mono">{formatarMoeda(op.baseComissionamento)}</td>
 									<td className="mono">{formatarMoeda(op.comissaoLiquida)}</td>
 									<td>{op.criadoPorNome || "—"}</td>
+									<td>{formatarDataHora(op.criadoEm)}</td>
 									<td>{op.completadoPorNome || "—"}</td>
 									<td>{formatarDataHora(op.completadoEm)}</td>
 								</tr>

@@ -29,6 +29,12 @@ class Operacao {
 	@Column(name = "codigo_banco")
 	private String codigoBanco;
 
+	// Incremento 71: só números (guardado como texto pra preservar zeros à esquerda).
+	// Obrigatório quando PR/CR/VIR é "Crédito", opcional nos demais — ver
+	// OperacaoService.validarCodigoOperacao.
+	@Column(name = "codigo_operacao")
+	private String codigoOperacao;
+
 	@Column(name = "cliente_id")
 	private Long clienteId;
 
@@ -39,6 +45,11 @@ class Operacao {
 
 	@Column(name = "pr_cr_vir")
 	private String prCrVir;
+
+	// Incremento 75: Fundo deixou de ser derivado do tipo (regra antiga: P/M fixos).
+	// Pronto continua "P"; os demais tipos aceitam qualquer letra vinda na requisição —
+	// por isso é persistido. Ver OperacaoService.validarFundo.
+	private String fundo;
 
 	// Achado de negócio (Incremento 56): valor ENVIADO na criação, não calculado — "NA"
 	// quando PR/CR/VIR é "Pronto", um número (texto) com 3 casas decimais quando é
@@ -77,16 +88,19 @@ class Operacao {
 	protected Operacao() {
 	}
 
-	Operacao(String idTrade, LocalDate data, String codigoBanco, Long clienteId, Long bancoId, String cv,
-			String prCrVir, String spreadEmissao, String moeda, BigDecimal valorMe, BigDecimal spotAsset,
-			BigDecimal nivelamento, BigDecimal taxaFinal, Long criadoPorUsuarioId, Instant criadoEm) {
+	Operacao(String idTrade, LocalDate data, String codigoBanco, String codigoOperacao, Long clienteId, Long bancoId,
+			String cv, String prCrVir, String fundo, String spreadEmissao, String moeda, BigDecimal valorMe,
+			BigDecimal spotAsset, BigDecimal nivelamento, BigDecimal taxaFinal, Long criadoPorUsuarioId,
+			Instant criadoEm) {
 		this.idTrade = idTrade;
 		this.data = data;
 		this.codigoBanco = codigoBanco;
+		this.codigoOperacao = codigoOperacao;
 		this.clienteId = clienteId;
 		this.bancoId = bancoId;
 		this.cv = cv;
 		this.prCrVir = prCrVir;
+		this.fundo = fundo;
 		this.spreadEmissao = spreadEmissao;
 		this.moeda = moeda;
 		this.valorMe = valorMe;
@@ -114,6 +128,10 @@ class Operacao {
 		return codigoBanco;
 	}
 
+	String getCodigoOperacao() {
+		return codigoOperacao;
+	}
+
 	Long getClienteId() {
 		return clienteId;
 	}
@@ -128,6 +146,10 @@ class Operacao {
 
 	String getPrCrVir() {
 		return prCrVir;
+	}
+
+	String getFundo() {
+		return fundo;
 	}
 
 	String getSpreadEmissao() {
@@ -174,14 +196,17 @@ class Operacao {
 		return completadoEm;
 	}
 
-	void editar(String codigoBanco, Long clienteId, Long bancoId, String cv, String prCrVir, String spreadEmissao,
-			String moeda, BigDecimal valorMe, BigDecimal spotAsset, BigDecimal nivelamento, BigDecimal taxaFinal) {
+	void editar(String codigoBanco, String codigoOperacao, Long clienteId, Long bancoId, String cv, String prCrVir,
+			String fundo, String spreadEmissao, String moeda, BigDecimal valorMe, BigDecimal spotAsset,
+			BigDecimal nivelamento, BigDecimal taxaFinal) {
 		// Data não entra aqui de propósito: não pode ser editada depois de criada (pedido do usuário).
 		this.codigoBanco = codigoBanco;
+		this.codigoOperacao = codigoOperacao;
 		this.clienteId = clienteId;
 		this.bancoId = bancoId;
 		this.cv = cv;
 		this.prCrVir = prCrVir;
+		this.fundo = fundo;
 		this.spreadEmissao = spreadEmissao;
 		this.moeda = moeda;
 		this.valorMe = valorMe;

@@ -17,6 +17,9 @@ const FORM_VAZIO = {
 	data: "",
 	clienteId: "",
 	bancoId: "",
+	// Código da operação (Incremento 71): só números; opcional aqui porque a tela só cria
+	// ordens "Pronto" — a obrigatoriedade (tipo Crédito) é validada pelo backend (400).
+	codigoOperacao: "",
 	cv: "",
 	prCrVir: "Pronto",
 	fundo: "P",
@@ -60,6 +63,10 @@ export default function OperacoesPage() {
 	const [carregando, setCarregando] = useState(true);
 	const [operacaoParaConfirmar, setOperacaoParaConfirmar] = useState(null);
 	const [operacaoParaCancelar, setOperacaoParaCancelar] = useState(null);
+	// Seleção múltipla pra confirmar várias ordens de uma vez (pedido do usuário):
+	// guarda os ids marcados; o "Selecionar todas" age sobre as linhas filtradas visíveis.
+	const [selecionadas, setSelecionadas] = useState(new Set());
+	const [confirmandoSelecionadas, setConfirmandoSelecionadas] = useState(false);
 
 	async function carregarTudo() {
 		setCarregando(true);
@@ -93,10 +100,11 @@ export default function OperacoesPage() {
 		try {
 			const payload = {
 				...form,
+				codigoOperacao: form.codigoOperacao || null,
 				clienteId: Number(form.clienteId),
 				bancoId: Number(form.bancoId),
 				valorMe: Number(form.valorMe),
-				spotAsset: Number(form.spotAsset),
+				spotAsset: form.spotAsset === "" || form.spotAsset == null ? null : Number(form.spotAsset),
 				nivelamento: Number(form.nivelamento),
 				taxaFinal: Number(form.taxaFinal),
 			};
@@ -118,16 +126,20 @@ export default function OperacoesPage() {
 			data: op.data,
 			clienteId: String(op.clienteId),
 			bancoId: String(op.bancoId),
+			codigoOperacao: op.codigoOperacao || "",
 			cv: op.cv,
 			prCrVir: op.prCrVir,
 			// A tela não tem campo pra editar prCrVir, então fundo é recalculado a partir do
 			// valor existente (não hardcoded "P") — pra continuar correto caso a ordem sendo
 			// editada tenha sido criada via API como Crédito/Virtual (fundo "M").
-			fundo: calcularFundo(op.prCrVir),
+			// Incremento 75: o Fundo agora é persistido (fora de Pronto aceita qualquer
+			// letra via API) — reenvia o valor guardado; o fallback derivado só cobre
+			// resposta antiga ainda em cache.
+			fundo: op.fundo || calcularFundo(op.prCrVir),
 			spreadEmissao: op.spreadEmissao,
 			moeda: op.moeda,
 			valorMe: String(op.valorMe),
-			spotAsset: String(op.spotAsset),
+			spotAsset: op.spotAsset == null ? "" : String(op.spotAsset),
 			nivelamento: String(op.nivelamento),
 			taxaFinal: String(op.taxaFinal),
 		});
@@ -160,6 +172,38 @@ export default function OperacoesPage() {
 		await mudarStatus(id, "CANCELADO");
 	}
 
+	function alternarSelecao(id) {
+		setSelecionadas((atual) => {
+			const novo = new Set(atual);
+			if (novo.has(id)) {
+				novo.delete(id);
+			} else {
+				novo.add(id);
+			}
+			return novo;
+		});
+	}
+
+	function alternarSelecaoTodas(visiveis, todasMarcadas) {
+		setSelecionadas(todasMarcadas ? new Set() : new Set(visiveis.map((op) => op.id)));
+	}
+
+	async function confirmarSelecionadas(ids) {
+		setConfirmandoSelecionadas(false);
+		// Confirma uma a uma pelo mesmo endpoint da confirmação individual (mantém a
+		// auditoria por ordem); se alguma falhar, o erro aparece no pop-up e as demais
+		// seguem — a recarga no final mostra o que de fato foi confirmado.
+		for (const id of ids) {
+			try {
+				await api.patch(`/operacoes/${id}/status`, { status: "CONFIRMADO" });
+			} catch {
+				// erro já mostrado como pop-up pelo api/client.js
+			}
+		}
+		setSelecionadas(new Set());
+		carregarTudo();
+	}
+
 	function atualizarFiltro(campo, valor) {
 		setFiltros((atual) => ({ ...atual, [campo]: valor }));
 	}
@@ -171,6 +215,10 @@ export default function OperacoesPage() {
 	// mesmo critério usado na aba Confirmadas (Incremento 68).
 	const moedasDisponiveis = [...new Set(emAndamento.map((op) => op.moeda).filter(Boolean))].sort();
 
+	// Fundo deixou de ter domínio fechado P/M (Incremento 75) — as opções do filtro vêm
+	// das letras que já aparecem nas ordens carregadas, mesmo critério das moedas.
+	const fundosDisponiveis = [...new Set(emAndamento.map((op) => op.fundo || calcularFundo(op.prCrVir)).filter(Boolean))].sort();
+
 	const filtradas = emAndamento.filter((op) => {
 		if (filtros.data && op.data !== filtros.data) return false;
 		if (filtros.moeda && op.moeda !== filtros.moeda) return false;
@@ -181,13 +229,18 @@ export default function OperacoesPage() {
 		if (filtros.cv && op.cv !== filtros.cv) return false;
 		if (filtros.tipo && (op.prCrVir || "").toLowerCase() !== filtros.tipo.toLowerCase()) return false;
 		if (!contemTexto(op.bancoNome, filtros.banco)) return false;
-		if (filtros.fundo && calcularFundo(op.prCrVir) !== filtros.fundo) return false;
+		if (filtros.fundo && (op.fundo || calcularFundo(op.prCrVir)) !== filtros.fundo) return false;
 		if (!contemTexto(op.criadoPorNome, filtros.criadoPor)) return false;
 		if (!contemTexto(op.completadoPorNome, filtros.completadoPor)) return false;
 		return true;
 	});
 
 	const algumFiltroAtivo = Object.values(filtros).some((v) => v !== "");
+
+	// Só conta/age sobre ordens selecionadas que continuam visíveis com os filtros atuais
+	// — o que o usuário vê marcado é exatamente o que o botão confirma.
+	const idsSelecionadosVisiveis = filtradas.filter((op) => selecionadas.has(op.id)).map((op) => op.id);
+	const todasVisiveisSelecionadas = filtradas.length > 0 && idsSelecionadosVisiveis.length === filtradas.length;
 
 	return (
 		<div>
@@ -199,7 +252,7 @@ export default function OperacoesPage() {
 			{!ehConsultor && (
 			<form onSubmit={salvar} className="form-operacao">
 				<label>
-					Data
+					Data do Fechamento
 					<input
 						type="date"
 						value={form.data}
@@ -230,6 +283,18 @@ export default function OperacoesPage() {
 					/>
 				</label>
 				<label>
+					Código Operação Origem
+					<input
+						type="text"
+						inputMode="numeric"
+						pattern="\d*"
+						title="Só números"
+						value={form.codigoOperacao}
+						onChange={(e) => setForm({ ...form, codigoOperacao: e.target.value.replace(/\D/g, "") })}
+						placeholder="Opcional"
+					/>
+				</label>
+				<label>
 					C/V
 					<select
 						value={form.cv}
@@ -252,7 +317,7 @@ export default function OperacoesPage() {
 					/>
 				</label>
 				<label>
-					Valor em ME
+					Valor em moeda
 					<input
 						type="number"
 						step="0.01"
@@ -261,16 +326,9 @@ export default function OperacoesPage() {
 						required
 					/>
 				</label>
-				<label>
-					Spot Asset
-					<input
-						type="number"
-						step="0.0001"
-						value={form.spotAsset}
-						onChange={(e) => setForm({ ...form, spotAsset: e.target.value })}
-						required
-					/>
-				</label>
+				{/* Spot Asset não tem campo na tela (Incremento 72, pedido do usuário): entra
+				    somente via API. Continua no estado do form (escondido) pra não apagar o
+				    valor de uma ordem criada via API ao editá-la — mesmo padrão do prCrVir. */}
 				<label>
 					Nivelamento
 					<input
@@ -304,7 +362,7 @@ export default function OperacoesPage() {
 
 			<div className="relatorio-filtros">
 				<label>
-					Data
+					Data do Fechamento
 					<input type="date" value={filtros.data} onChange={(e) => atualizarFiltro("data", e.target.value)} />
 				</label>
 				<label>
@@ -319,7 +377,7 @@ export default function OperacoesPage() {
 					</select>
 				</label>
 				<label>
-					Valor Moeda
+					Valor em moeda
 					<input
 						value={filtros.valorMoeda}
 						onChange={(e) => atualizarFiltro("valorMoeda", e.target.value)}
@@ -327,7 +385,7 @@ export default function OperacoesPage() {
 					/>
 				</label>
 				<label>
-					CNPJ
+					CNPJ/CPF
 					<input
 						value={filtros.cnpj}
 						onChange={(e) => atualizarFiltro("cnpj", e.target.value)}
@@ -343,7 +401,7 @@ export default function OperacoesPage() {
 					/>
 				</label>
 				<label>
-					ID do trade
+					Código da Ordem
 					<input
 						value={filtros.idTrade}
 						onChange={(e) => atualizarFiltro("idTrade", e.target.value)}
@@ -360,7 +418,7 @@ export default function OperacoesPage() {
 					</select>
 				</label>
 				<label>
-					Tipo
+					Tipo Ordem
 					<select value={filtros.tipo} onChange={(e) => atualizarFiltro("tipo", e.target.value)}>
 						<option value="">Todos</option>
 						<option value="Pronto">Pronto</option>
@@ -380,8 +438,11 @@ export default function OperacoesPage() {
 					Fundo
 					<select value={filtros.fundo} onChange={(e) => atualizarFiltro("fundo", e.target.value)}>
 						<option value="">Todos</option>
-						<option value="P">P</option>
-						<option value="M">M</option>
+						{fundosDisponiveis.map((fundo) => (
+							<option key={fundo} value={fundo}>
+								{fundo}
+							</option>
+						))}
 					</select>
 				</label>
 				<label>
@@ -421,30 +482,57 @@ export default function OperacoesPage() {
 			) : filtradas.length === 0 ? (
 				<EmptyState title="Nenhuma ordem encontrada" message="Ajuste os filtros acima e tente novamente." />
 			) : (
+			<>
+			{!ehConsultor && (
+				<div style={{ margin: "12px 0" }}>
+					<button
+						type="button"
+						className="btn btn-primary"
+						disabled={idsSelecionadosVisiveis.length === 0}
+						onClick={() => setConfirmandoSelecionadas(true)}
+					>
+						Confirmar selecionadas ({idsSelecionadosVisiveis.length})
+					</button>
+				</div>
+			)}
 			<div className="table-card">
 			<table>
 				<thead>
 					<tr>
-						<th>ID do trade</th>
-						<th>Data</th>
+						{!ehConsultor && (
+							<th>
+								<input
+									type="checkbox"
+									title="Selecionar todas as ordens visíveis"
+									checked={todasVisiveisSelecionadas}
+									onChange={() => alternarSelecaoTodas(filtradas, todasVisiveisSelecionadas)}
+								/>
+							</th>
+						)}
+						<th>Código da Ordem</th>
+						<th>Código Operação Origem</th>
+						<th>Data do Fechamento</th>
 						<th>Cliente</th>
-						<th>CNPJ</th>
+						<th>CNPJ/CPF</th>
 						<th>Banco</th>
 						<th>C/V</th>
-						<th>Tipo</th>
+						<th>Tipo Ordem</th>
+						<th>Valor em moeda</th>
+						<th>Spot Asset</th>
+						<th>Nivelamento</th>
+						<th>Taxa Final</th>
 						<th>Fundo</th>
 						<th>Moeda</th>
-						<th>Valor ME</th>
-						<th>R$</th>
-						<th>Total Bruto</th>
-						<th>Valor Absoluto</th>
+						<th>Valor em Real</th>
+						<th>Total Bruto Câmbio</th>
 						<th>Spread emissão</th>
 						<th>Spread liquidação</th>
 						<th>Custo</th>
 						<th>Rebate</th>
 						<th>Base de comissionamento</th>
-						<th>Comissão</th>
+						<th>Comissão Líquida</th>
 						<th>Criado por</th>
+						<th>Criado em</th>
 						<th>Completado por</th>
 						<th>Completado em</th>
 						<th></th>
@@ -453,29 +541,47 @@ export default function OperacoesPage() {
 				<tbody>
 					{filtradas.map((op) => (
 						<tr key={op.id}>
+							{!ehConsultor && (
+								<td>
+									<input
+										type="checkbox"
+										checked={selecionadas.has(op.id)}
+										onChange={() => alternarSelecao(op.id)}
+									/>
+								</td>
+							)}
 							<td className="mono">{op.idTrade}</td>
+							<td className="mono">{op.codigoOperacao || "—"}</td>
 							<td>{formatarData(op.data)}</td>
 							<td>{op.clienteNome || `#${op.clienteId}`}</td>
 							<td>{op.clienteDocumento || "—"}</td>
 							<td>{op.bancoNome || `#${op.bancoId}`}</td>
 							<td>{op.cv}</td>
 							<td>{op.prCrVir}</td>
-							<td>{calcularFundo(op.prCrVir)}</td>
-							<td>{op.moeda}</td>
 							<td className="mono">{formatarMoeda(op.valorMe)}</td>
-							{/* Campos calculados — ficam vazios ("—") enquanto a ordem está Em andamento;
-							    só existem depois de Confirmada (docs/dominio.md) — mesma coluna, mesmo
-							    formatador da aba Confirmadas, só o valor que ainda não existe. */}
+							<td className="mono">{formatarMoeda(op.spotAsset)}</td>
+							<td className="mono">{formatarMoeda(op.nivelamento)}</td>
+							<td className="mono">{formatarMoeda(op.taxaFinal)}</td>
+							<td>{op.fundo || calcularFundo(op.prCrVir)}</td>
+							<td>{op.moeda}</td>
+							{/* Campos calculados — desde o Incremento 76 existem em QUALQUER status
+							    (em andamento são uma prévia que acompanha as edições; confirmar trava).
+							    "—" só aparece quando não há fórmula pro caso (ex: Total Bruto com C/V
+							    desconhecido) — docs/dominio.md. */}
 							<td className="mono">{formatarMoeda(op.reais)}</td>
 							<td className="mono">{formatarMoeda(op.totalBrutoCambio)}</td>
-							<td className="mono">{formatarMoeda(op.valorAbsoluto)}</td>
 							<td className="mono">{formatarSpreadEmissao(op.spreadEmissao)}</td>
 							<td className="mono">{formatarPercentual(op.spreadLiquidacao)}</td>
-							<td className="mono">{formatarPercentual(op.custo)}</td>
+							{/* Custo só é informado quando a ordem é Crédito (pedido do usuário) — pros
+							    demais tipos a API devolve 0 fixo (Incremento 57), mas a tabela mostra "—". */}
+							<td className="mono">
+								{(op.prCrVir || "").toLowerCase() === "credito" ? formatarPercentual(op.custo) : "—"}
+							</td>
 							<td className="mono">{formatarMoeda(op.rebate)}</td>
 							<td className="mono">{formatarMoeda(op.baseComissionamento)}</td>
 							<td className="mono">{formatarMoeda(op.comissaoLiquida)}</td>
 							<td>{op.criadoPorNome || "—"}</td>
+							<td>{formatarDataHora(op.criadoEm)}</td>
 							<td>{op.completadoPorNome || "—"}</td>
 							<td>{formatarDataHora(op.completadoEm)}</td>
 							<td>
@@ -504,7 +610,22 @@ export default function OperacoesPage() {
 				</tbody>
 			</table>
 		</div>
+		</>
 		)}
+
+		<ConfirmModal
+			open={confirmandoSelecionadas}
+			title="Confirmar ordens selecionadas"
+			message={
+				<>
+					Confirma as <strong>{idsSelecionadosVisiveis.length}</strong> ordens selecionadas? Os valores
+					calculados de cada uma ficam travados como estão e nenhuma delas pode voltar para "Em andamento".
+				</>
+			}
+			confirmLabel="Confirmar todas"
+			onConfirm={() => confirmarSelecionadas(idsSelecionadosVisiveis)}
+			onCancel={() => setConfirmandoSelecionadas(false)}
+		/>
 
 		<ConfirmModal
 			open={operacaoParaConfirmar !== null}
@@ -514,8 +635,8 @@ export default function OperacoesPage() {
 					<>
 						Confirma a ordem <strong>{operacaoParaConfirmar.idTrade}</strong> (
 						{operacaoParaConfirmar.clienteNome}, {operacaoParaConfirmar.moeda}{" "}
-						{formatarMoeda(operacaoParaConfirmar.valorMe)})? Os valores calculados (R$, Total Bruto e
-						Comissão) passam a existir a partir de agora e a ordem não pode voltar para "Em andamento".
+						{formatarMoeda(operacaoParaConfirmar.valorMe)})? Os valores calculados ficam travados como
+						estão e a ordem não pode voltar para "Em andamento".
 					</>
 				)
 			}

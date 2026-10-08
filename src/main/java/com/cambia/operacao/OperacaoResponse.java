@@ -9,6 +9,7 @@ record OperacaoResponse(
 		String idTrade,
 		LocalDate data,
 		String codigoBanco,
+		String codigoOperacao,
 		Long clienteId,
 		String clienteNome,
 		String clienteDocumento,
@@ -16,6 +17,7 @@ record OperacaoResponse(
 		String bancoNome,
 		String cv,
 		String prCrVir,
+		String fundo,
 		String spreadEmissao,
 		String moeda,
 		BigDecimal valorMe,
@@ -36,6 +38,20 @@ record OperacaoResponse(
 		String completadoPorNome,
 		Instant completadoEm) {
 
+	/**
+	 * Cópia com os campos calculados zerados. Usada pelos relatórios que agregam
+	 * dinheiro (ex: Rankings) pra manter a semântica de "só conta o confirmado" depois
+	 * que o Incremento 76 passou a calcular os valores em qualquer status: a prévia de
+	 * uma ordem em andamento aparece nas telas de Ordens, mas não pode somar comissão
+	 * em ranking — exatamente o que o gate antigo (Incremento 39) garantia por tabela.
+	 */
+	OperacaoResponse semValoresCalculados() {
+		return new OperacaoResponse(id, idTrade, data, codigoBanco, codigoOperacao, clienteId, clienteNome,
+				clienteDocumento, bancoId, bancoNome, cv, prCrVir, fundo, spreadEmissao, moeda, valorMe, spotAsset,
+				nivelamento, taxaFinal, null, null, null, null, null, null, null, null, status, criadoPorNome,
+				criadoEm, completadoPorNome, completadoEm);
+	}
+
 	static OperacaoResponse from(Operacao operacao, ValoresCalculados valores, String criadoPorNome,
 			String completadoPorNome, String clienteNome, String clienteDocumento, String bancoNome) {
 		return new OperacaoResponse(
@@ -43,6 +59,7 @@ record OperacaoResponse(
 				operacao.getIdTrade(),
 				operacao.getData(),
 				operacao.getCodigoBanco(),
+				operacao.getCodigoOperacao(),
 				operacao.getClienteId(),
 				clienteNome,
 				clienteDocumento,
@@ -50,6 +67,7 @@ record OperacaoResponse(
 				bancoNome,
 				operacao.getCv(),
 				operacao.getPrCrVir(),
+				operacao.getFundo(),
 				operacao.getSpreadEmissao(),
 				operacao.getMoeda(),
 				operacao.getValorMe(),

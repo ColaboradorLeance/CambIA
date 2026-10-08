@@ -191,7 +191,10 @@ export default function RelatorioOperacoesPage() {
 									<td>{nomeBanco(op.bancoId)}</td>
 									<td>{op.cv}</td>
 									<td>{op.prCrVir}</td>
-									<td>{calcularFundo(op.prCrVir)}</td>
+									{/* Incremento 75: Fundo é persistido (fora de Pronto aceita qualquer letra
+									    via API) — mostra o valor guardado; a derivação só cobre resposta antiga
+									    em cache, mesmo padrão das telas de Ordens. */}
+									<td>{op.fundo || calcularFundo(op.prCrVir)}</td>
 									<td>{op.moeda}</td>
 									<td className="mono">{formatarMoeda(op.valorMe)}</td>
 									<td>

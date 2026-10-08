@@ -71,7 +71,7 @@ class OperacaoControllerTests {
 
 	private String operacaoJson() {
 		return """
-				{"data":"2026-07-02","codigoBanco":"143258","clienteId":%d,"bancoId":%d,"cv":"V","prCrVir":"Credito","fundo":"M",
+				{"data":"2026-07-02","codigoBanco":"143258","clienteId":%d,"bancoId":%d,"cv":"V","prCrVir":"Credito","fundo":"M","codigoOperacao":"555",
 				"spreadEmissao":"0.020","moeda":"USD","valorMe":885242.40,"spotAsset":5.1990,"nivelamento":5.1960,"taxaFinal":5.1856}
 				""".formatted(clienteId, bancoId);
 	}
@@ -170,7 +170,7 @@ class OperacaoControllerTests {
 	@Test
 	void rejeitaClienteInexistente() throws Exception {
 		String json = """
-				{"data":"2026-07-02","clienteId":999999,"bancoId":%d,"cv":"V","prCrVir":"Credito","fundo":"M",
+				{"data":"2026-07-02","clienteId":999999,"bancoId":%d,"cv":"V","prCrVir":"Credito","fundo":"M","codigoOperacao":"555",
 				"spreadEmissao":"0.020","moeda":"USD","valorMe":100.00,"spotAsset":5.10,"nivelamento":5.10,"taxaFinal":5.10}
 				""".formatted(bancoId);
 
@@ -184,7 +184,7 @@ class OperacaoControllerTests {
 	@Test
 	void rejeitaBancoInexistente() throws Exception {
 		String json = """
-				{"data":"2026-07-02","clienteId":%d,"bancoId":999999,"cv":"V","prCrVir":"Credito","fundo":"M",
+				{"data":"2026-07-02","clienteId":%d,"bancoId":999999,"cv":"V","prCrVir":"Credito","fundo":"M","codigoOperacao":"555",
 				"spreadEmissao":"0.020","moeda":"USD","valorMe":100.00,"spotAsset":5.10,"nivelamento":5.10,"taxaFinal":5.10}
 				""".formatted(clienteId);
 
@@ -198,7 +198,7 @@ class OperacaoControllerTests {
 	@Test
 	void rejeitaSemValorEmMe() throws Exception {
 		String json = """
-				{"data":"2026-07-02","clienteId":%d,"bancoId":%d,"cv":"V","prCrVir":"Credito","fundo":"M",
+				{"data":"2026-07-02","clienteId":%d,"bancoId":%d,"cv":"V","prCrVir":"Credito","fundo":"M","codigoOperacao":"555",
 				"spreadEmissao":"0.020","moeda":"USD","spotAsset":5.10,"nivelamento":5.10,"taxaFinal":5.10}
 				""".formatted(clienteId, bancoId);
 
@@ -212,7 +212,7 @@ class OperacaoControllerTests {
 	@Test
 	void rejeitaSpotAssetComMaisDeQuatroCasasDecimais() throws Exception {
 		String json = """
-				{"data":"2026-07-02","clienteId":%d,"bancoId":%d,"cv":"V","prCrVir":"Credito","fundo":"M",
+				{"data":"2026-07-02","clienteId":%d,"bancoId":%d,"cv":"V","prCrVir":"Credito","fundo":"M","codigoOperacao":"555",
 				"spreadEmissao":"0.020","moeda":"USD","valorMe":100.00,"spotAsset":5.19999,"nivelamento":5.10,"taxaFinal":5.10}
 				""".formatted(clienteId, bancoId);
 
@@ -229,7 +229,7 @@ class OperacaoControllerTests {
 	@Test
 	void rejeitaNivelamentoComMaisDeQuatroCasasDecimais() throws Exception {
 		String json = """
-				{"data":"2026-07-02","clienteId":%d,"bancoId":%d,"cv":"V","prCrVir":"Credito","fundo":"M",
+				{"data":"2026-07-02","clienteId":%d,"bancoId":%d,"cv":"V","prCrVir":"Credito","fundo":"M","codigoOperacao":"555",
 				"spreadEmissao":"0.020","moeda":"USD","valorMe":100.00,"spotAsset":5.10,"nivelamento":5.19999,"taxaFinal":5.10}
 				""".formatted(clienteId, bancoId);
 
@@ -243,7 +243,7 @@ class OperacaoControllerTests {
 	@Test
 	void aceitaSpotAssetENivelamentoComExatamenteQuatroCasasDecimais() throws Exception {
 		String json = """
-				{"data":"2026-07-02","clienteId":%d,"bancoId":%d,"cv":"V","prCrVir":"Credito","fundo":"M",
+				{"data":"2026-07-02","clienteId":%d,"bancoId":%d,"cv":"V","prCrVir":"Credito","fundo":"M","codigoOperacao":"555",
 				"spreadEmissao":"0.020","moeda":"USD","valorMe":100.00,"spotAsset":5.1999,"nivelamento":5.1234,"taxaFinal":5.10}
 				""".formatted(clienteId, bancoId);
 
@@ -255,15 +255,19 @@ class OperacaoControllerTests {
 	}
 
 	@Test
-	void novaOperacaoComecaEmAndamentoSemValoresCalculados() throws Exception {
+	void novaOperacaoEmAndamentoJaCalculaOsValores() throws Exception {
+		// Incremento 76 (substitui a regra do Incremento 39, que só calculava depois de
+		// confirmar): os valores calculados existem SEMPRE, em qualquer status — pedido
+		// do usuário ("calcular e exibir sempre, inclusive em andamento"). Enquanto a
+		// ordem está em andamento eles são uma prévia, que muda se a ordem for editada.
 		String location = criarOperacao(operacaoJson());
 
 		mockMvc.perform(get(location).header("Authorization", usuarioAuthHeader))
 				.andExpect(jsonPath("$.status").value("ANDAMENTO"))
-				.andExpect(jsonPath("$.reais").value(org.hamcrest.Matchers.nullValue()))
-				.andExpect(jsonPath("$.totalBrutoCambio").value(org.hamcrest.Matchers.nullValue()))
-				.andExpect(jsonPath("$.comissaoLiquida").value(org.hamcrest.Matchers.nullValue()))
-				.andExpect(jsonPath("$.valorAbsoluto").value(org.hamcrest.Matchers.nullValue()));
+				.andExpect(jsonPath("$.reais").value(4590512.99))
+				.andExpect(jsonPath("$.totalBrutoCambio").value(9206.52))
+				.andExpect(jsonPath("$.comissaoLiquida").value(6144.89))
+				.andExpect(jsonPath("$.valorAbsoluto").value(9206.52));
 	}
 
 	@Test
@@ -326,7 +330,9 @@ class OperacaoControllerTests {
 	}
 
 	@Test
-	void cancelarOperacaoEmAndamentoNaoCalculaValores() throws Exception {
+	void cancelarOperacaoMantemOsValoresCalculados() throws Exception {
+		// Incremento 76: "calcular e exibir sempre" vale pra qualquer status, inclusive
+		// Cancelado — os valores são derivados dos campos da ordem, que continuam ali.
 		String location = criarOperacao(operacaoJson());
 
 		mockMvc.perform(patch(location + "/status")
@@ -335,10 +341,10 @@ class OperacaoControllerTests {
 						.content("{\"status\":\"CANCELADO\"}"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.status").value("CANCELADO"))
-				.andExpect(jsonPath("$.reais").value(org.hamcrest.Matchers.nullValue()))
-				.andExpect(jsonPath("$.totalBrutoCambio").value(org.hamcrest.Matchers.nullValue()))
-				.andExpect(jsonPath("$.comissaoLiquida").value(org.hamcrest.Matchers.nullValue()))
-				.andExpect(jsonPath("$.valorAbsoluto").value(org.hamcrest.Matchers.nullValue()));
+				.andExpect(jsonPath("$.reais").value(4590512.99))
+				.andExpect(jsonPath("$.totalBrutoCambio").value(9206.52))
+				.andExpect(jsonPath("$.comissaoLiquida").value(6144.89))
+				.andExpect(jsonPath("$.valorAbsoluto").value(9206.52));
 
 		mockMvc.perform(get(location).header("Authorization", usuarioAuthHeader))
 				.andExpect(jsonPath("$.status").value("CANCELADO"));

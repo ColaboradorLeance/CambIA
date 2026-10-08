@@ -35,11 +35,21 @@ class FechamentoService {
 	FechamentoResponse calcular(LocalDate data) {
 		List<OperacaoResponse> respostas = operacoesDoDia(data);
 
+		// Quebras continuam contando só dinheiro confirmado: desde o Incremento 76
+		// toResponse calcula em qualquer status, então os calculados das não confirmadas
+		// (em andamento/canceladas) são zerados aqui antes de somar — a ordem continua
+		// aparecendo na quantidade do agrupamento, como sempre apareceu. Mesmo gate já
+		// aplicado nos Rankings (RelatorioRankingService); sem ele, a prévia de uma ordem
+		// em andamento (e até de uma cancelada) inflaria R$/comissão do Fechamento.
+		List<OperacaoResponse> respostasSoDinheiroConfirmado = respostas.stream()
+				.map(r -> r.status() == StatusOperacao.CONFIRMADO ? r : r.semValoresCalculados())
+				.toList();
+
 		return new FechamentoResponse(
 				data,
 				calcularResumo(respostas),
 				calcularResultado(respostas),
-				calcularQuebras(respostas),
+				calcularQuebras(respostasSoDinheiroConfirmado),
 				calcularPosicaoEmAberto());
 	}
 

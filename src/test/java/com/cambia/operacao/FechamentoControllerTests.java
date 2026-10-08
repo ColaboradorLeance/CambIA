@@ -85,7 +85,7 @@ class FechamentoControllerTests {
 	private String criarOperacao(String data, Long bancoId, String cv, String moeda, String valorMe,
 			String nivelamento, String taxaFinal) throws Exception {
 		String json = """
-				{"data":"%s","clienteId":%d,"bancoId":%d,"cv":"%s","prCrVir":"Credito","fundo":"M","spreadEmissao":"0.020","moeda":"%s",
+				{"data":"%s","clienteId":%d,"bancoId":%d,"cv":"%s","prCrVir":"Credito","fundo":"M","codigoOperacao":"555","spreadEmissao":"0.020","moeda":"%s",
 				"valorMe":%s,"spotAsset":%s,"nivelamento":%s,"taxaFinal":%s}
 				""".formatted(data, clienteId, bancoId, cv, moeda, valorMe, nivelamento, nivelamento, taxaFinal);
 
@@ -137,8 +137,14 @@ class FechamentoControllerTests {
 				.andExpect(jsonPath("$.resultadoFinanceiro.quantidadePorMoeda.EUR").value(1))
 				.andExpect(jsonPath("$.quebras.porBanco[0].rotulo").value("TLX"))
 				.andExpect(jsonPath("$.quebras.porBanco[0].quantidade").value(2))
+				// Op3 (em andamento) conta na quantidade do grupo TLX, mas NÃO soma dinheiro:
+				// desde o Incremento 76 a prévia existe na resposta da operação, e as quebras
+				// zeram os calculados das não confirmadas antes de somar (só op1 entra aqui).
+				.andExpect(jsonPath("$.quebras.porBanco[0].totalReais").value(5000.00))
+				.andExpect(jsonPath("$.quebras.porBanco[0].totalComissaoLiquida").value(70.00))
 				.andExpect(jsonPath("$.quebras.porBanco[1].rotulo").value("BZA"))
 				.andExpect(jsonPath("$.quebras.porBanco[1].quantidade").value(1))
+				.andExpect(jsonPath("$.quebras.porBanco[1].totalReais").value(10100.00))
 				.andExpect(jsonPath("$.quebras.porMoeda[0].rotulo").value("USD"))
 				.andExpect(jsonPath("$.quebras.porMoeda[0].quantidade").value(2))
 				.andExpect(jsonPath("$.quebras.porMoeda[1].rotulo").value("EUR"))

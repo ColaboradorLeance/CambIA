@@ -77,7 +77,7 @@ class OperacaoEdicaoTests {
 
 	private String criarOperacao(Long clienteId, Long bancoId, String valorMe) throws Exception {
 		String json = """
-				{"data":"2026-08-26","clienteId":%d,"bancoId":%d,"cv":"V","prCrVir":"Credito","fundo":"M","spreadEmissao":"0.020","moeda":"USD",
+				{"data":"2026-08-26","clienteId":%d,"bancoId":%d,"cv":"V","prCrVir":"Credito","fundo":"M","codigoOperacao":"555","spreadEmissao":"0.020","moeda":"USD",
 				"valorMe":%s,"spotAsset":5.10,"nivelamento":5.10,"taxaFinal":5.00}
 				""".formatted(clienteId, bancoId, valorMe);
 

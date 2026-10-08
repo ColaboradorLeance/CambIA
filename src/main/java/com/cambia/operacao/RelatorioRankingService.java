@@ -33,7 +33,14 @@ class RelatorioRankingService {
 	private RankingsResponse calcularParaIntervalo(Periodo periodo, IntervaloDatas intervalo) {
 		List<Operacao> operacoes = operacaoRepository.buscarFiltrado(intervalo.inicio(), intervalo.fim(), null, null,
 				null, null, null, null, null);
-		List<OperacaoResponse> respostas = operacoes.stream().map(operacaoService::toResponse).toList();
+		// Rankings continuam contando só dinheiro confirmado (mesma semântica do
+		// Fechamento): desde o Incremento 76 toResponse calcula em qualquer status, então
+		// os calculados das não confirmadas são zerados aqui — a ordem continua aparecendo
+		// no agrupamento (ex: quem criou e ainda não completou figura com comissão 0).
+		List<OperacaoResponse> respostas = operacoes.stream()
+				.map(operacaoService::toResponse)
+				.map(r -> r.status() == StatusOperacao.CONFIRMADO ? r : r.semValoresCalculados())
+				.toList();
 
 		QuebrasPorDimensao quebras = fechamentoService.calcularQuebras(respostas);
 

@@ -17,24 +17,25 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Achado de negócio (Incremento 56): Spread emissão não é calculado — vem no próprio
- * request de criação/edição, e precisa ser consistente com PR/CR/VIR: "NA" quando é
- * "Pronto" (único tipo que a tela de Registrar Operação consegue criar); um número com
- * o tipo da ordem não sendo "Pronto" (Crédito/Virtual, só alcançáveis via API). Sem campo
- * nenhum na tela — a UI sempre manda "NA" por baixo dos panos, já que só cria operações
- * "Pronto" (ver frontend/src/pages/OperacoesPage.jsx).
+ * Incremento 72: Spot Asset deixou de ser coletado na tela de Registrar Operação —
+ * passa a entrar somente via API (pedido do usuário). Com isso, deixou de ser
+ * obrigatório em toda criação/edição: agora é obrigatório só quando o tipo da ordem
+ * (PR/CR/VIR) é "Crédito" (único caso em que entra numa fórmula confirmada — o Custo),
+ * e opcional nos demais. Mesmo padrão condicional do Spread emissão/Fundo/Código da
+ * operação.
  */
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
-class OperacaoSpreadEmissaoTests {
+class OperacaoSpotAssetTests {
 
 	@Autowired
 	private MockMvc mockMvc;
@@ -57,96 +58,108 @@ class OperacaoSpreadEmissaoTests {
 		String clienteBody = mockMvc.perform(post("/clientes")
 						.header("Authorization", authHeader)
 						.contentType(MediaType.APPLICATION_JSON)
-						.content("{\"nome\":\"Cliente Spread Emissao\",\"documento\":\"11.111.111/0001-11\"}"))
+						.content("{\"nome\":\"Cliente Spot Asset\",\"documento\":\"33.333.333/0001-33\"}"))
 				.andReturn().getResponse().getContentAsString();
 		clienteId = ((Number) JsonPath.read(clienteBody, "$.id")).longValue();
 
 		String calculoBody = mockMvc.perform(post("/calculos")
 						.header("Authorization", authHeader)
 						.contentType(MediaType.APPLICATION_JSON)
-						.content("{\"nome\":\"Modelo Spread Emissao\",\"formula\":\"N*50%\"}"))
+						.content("{\"nome\":\"Modelo Spot Asset\",\"formula\":\"N*50%\"}"))
 				.andReturn().getResponse().getContentAsString();
 		Long calculoId = ((Number) JsonPath.read(calculoBody, "$.id")).longValue();
 
 		String bancoBody = mockMvc.perform(post("/bancos")
 						.header("Authorization", authHeader)
 						.contentType(MediaType.APPLICATION_JSON)
-						.content("{\"codigoBanco\":\"998\",\"sigla\":\"SE\",\"nome\":\"SE\",\"taxaRebate\":0,\"calculoId\":%d}"
+						.content("{\"codigoBanco\":\"996\",\"sigla\":\"SA\",\"nome\":\"SA\",\"taxaRebate\":0,\"calculoId\":%d}"
 								.formatted(calculoId)))
 				.andReturn().getResponse().getContentAsString();
 		bancoId = ((Number) JsonPath.read(bancoBody, "$.id")).longValue();
 	}
 
-	private String operacaoJson(String prCrVir, String spreadEmissao) {
+	private String operacaoJson(String prCrVir, String spotAssetJson) {
 		String fundo = "Pronto".equalsIgnoreCase(prCrVir) ? "P" : "M";
-		// codigoOperacao sempre presente: obrigatório pra Crédito (Incremento 71) e
-		// aceito pra qualquer tipo — mantém este teste focado só no Spread emissão.
+		String spreadEmissao = "Pronto".equalsIgnoreCase(prCrVir) ? "NA" : "0.020";
 		return """
 				{"data":"2026-09-01","clienteId":%d,"bancoId":%d,"cv":"V","prCrVir":"%s","fundo":"%s","spreadEmissao":"%s",
-				"codigoOperacao":"555","moeda":"USD","valorMe":1000,"spotAsset":5.10,"nivelamento":5.10,"taxaFinal":5.00}
-				""".formatted(clienteId, bancoId, prCrVir, fundo, spreadEmissao);
+				"codigoOperacao":"555","moeda":"USD","valorMe":1000,"spotAsset":%s,"nivelamento":5.10,"taxaFinal":5.00}
+				""".formatted(clienteId, bancoId, prCrVir, fundo, spreadEmissao, spotAssetJson);
 	}
 
 	@Test
-	void prontoComNaEhAceito() throws Exception {
+	void prontoSemSpotAssetEhAceito() throws Exception {
 		mockMvc.perform(post("/operacoes")
 						.header("Authorization", authHeader)
 						.contentType(MediaType.APPLICATION_JSON)
-						.content(operacaoJson("Pronto", "NA")))
+						.content(operacaoJson("Pronto", "null")))
 				.andExpect(status().isCreated())
-				.andExpect(jsonPath("$.spreadEmissao").value("NA"));
+				.andExpect(jsonPath("$.spotAsset").value(org.hamcrest.Matchers.nullValue()));
 	}
 
 	@Test
-	void prontoComNumeroEhRejeitado() throws Exception {
+	void virtualSemSpotAssetEhAceito() throws Exception {
 		mockMvc.perform(post("/operacoes")
 						.header("Authorization", authHeader)
 						.contentType(MediaType.APPLICATION_JSON)
-						.content(operacaoJson("Pronto", "0.020")))
+						.content(operacaoJson("Virtual", "null")))
+				.andExpect(status().isCreated());
+	}
+
+	@Test
+	void creditoSemSpotAssetEhRejeitado() throws Exception {
+		mockMvc.perform(post("/operacoes")
+						.header("Authorization", authHeader)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(operacaoJson("Credito", "null")))
 				.andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.detail", org.hamcrest.Matchers.containsString("Pronto")));
+				.andExpect(jsonPath("$.detail", org.hamcrest.Matchers.containsString("Crédito")));
 	}
 
 	@Test
-	void creditoComNumeroEhAceito() throws Exception {
+	void creditoComSpotAssetEhAceito() throws Exception {
 		mockMvc.perform(post("/operacoes")
 						.header("Authorization", authHeader)
 						.contentType(MediaType.APPLICATION_JSON)
-						.content(operacaoJson("Credito", "0.020")))
+						.content(operacaoJson("Credito", "5.1990")))
 				.andExpect(status().isCreated())
-				.andExpect(jsonPath("$.spreadEmissao").value("0.020"));
+				.andExpect(jsonPath("$.spotAsset").value(5.1990));
 	}
 
 	@Test
-	void virtualComNaEhRejeitado() throws Exception {
+	void spotAssetContinuaValidadoQuandoPresente() throws Exception {
+		// As regras que já existiam (positivo, até 4 casas decimais) continuam valendo
+		// quando o campo vem preenchido — só a obrigatoriedade mudou.
 		mockMvc.perform(post("/operacoes")
 						.header("Authorization", authHeader)
 						.contentType(MediaType.APPLICATION_JSON)
-						.content(operacaoJson("Virtual", "NA")))
+						.content(operacaoJson("Pronto", "-1")))
 				.andExpect(status().isBadRequest());
-	}
-
-	@Test
-	void virtualComTextoNaoNumericoEhRejeitado() throws Exception {
-		mockMvc.perform(post("/operacoes")
-						.header("Authorization", authHeader)
-						.contentType(MediaType.APPLICATION_JSON)
-						.content(operacaoJson("Virtual", "abc")))
-				.andExpect(status().isBadRequest());
-	}
-
-	@Test
-	void semSpreadEmissaoEhRejeitado() throws Exception {
-		String json = """
-				{"data":"2026-09-01","clienteId":%d,"bancoId":%d,"cv":"V","prCrVir":"Pronto","fundo":"P",
-				"moeda":"USD","valorMe":1000,"spotAsset":5.10,"nivelamento":5.10,"taxaFinal":5.00}
-				""".formatted(clienteId, bancoId);
 
 		mockMvc.perform(post("/operacoes")
 						.header("Authorization", authHeader)
 						.contentType(MediaType.APPLICATION_JSON)
-						.content(json))
+						.content(operacaoJson("Pronto", "5.12345")))
 				.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void prontoSemSpotAssetConfirmadaCalculaValoresComCustoZero() throws Exception {
+		// Garante que a cadeia de cálculo inteira é segura sem Spot Asset: o único uso
+		// dele é no Custo, que pra tipos fora de "Crédito" é 0 fixo sem tocar no campo.
+		String location = mockMvc.perform(post("/operacoes")
+						.header("Authorization", authHeader)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(operacaoJson("Pronto", "null")))
+				.andReturn().getResponse().getHeader("Location");
+
+		mockMvc.perform(patch(location + "/status")
+						.header("Authorization", authHeader)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{\"status\":\"CONFIRMADO\"}"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.custo").value(0.000))
+				.andExpect(jsonPath("$.reais").value(org.hamcrest.Matchers.notNullValue()));
 	}
 
 	@Test
@@ -154,21 +167,21 @@ class OperacaoSpreadEmissaoTests {
 		String location = mockMvc.perform(post("/operacoes")
 						.header("Authorization", authHeader)
 						.contentType(MediaType.APPLICATION_JSON)
-						.content(operacaoJson("Pronto", "NA")))
+						.content(operacaoJson("Pronto", "null")))
 				.andReturn().getResponse().getHeader("Location");
 
 		mockMvc.perform(put(location)
 						.header("Authorization", authHeader)
 						.contentType(MediaType.APPLICATION_JSON)
-						.content(operacaoJson("Pronto", "0.020")))
+						.content(operacaoJson("Credito", "null")))
 				.andExpect(status().isBadRequest());
 
 		mockMvc.perform(put(location)
 						.header("Authorization", authHeader)
 						.contentType(MediaType.APPLICATION_JSON)
-						.content(operacaoJson("Credito", "0.020")))
+						.content(operacaoJson("Credito", "5.1990")))
 				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.spreadEmissao").value("0.020"));
+				.andExpect(jsonPath("$.spotAsset").value(5.1990));
 	}
 
 }
