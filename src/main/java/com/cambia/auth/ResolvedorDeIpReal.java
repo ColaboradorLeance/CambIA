@@ -24,7 +24,7 @@ import jakarta.servlet.http.HttpServletRequest;
  * conectou nele por último (não deixa o valor do cliente substituir, só acrescenta —
  * ver {@code reverse-proxy/nginx.conf}, variável {@code $proxy_add_x_forwarded_for}).
  */
-final class ResolvedorDeIpReal {
+public final class ResolvedorDeIpReal {
 
 	private static final Pattern ENDERECO_INTERNO = Pattern.compile(
 			"^(127\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}"
@@ -36,7 +36,7 @@ final class ResolvedorDeIpReal {
 	private ResolvedorDeIpReal() {
 	}
 
-	static String resolver(HttpServletRequest request) {
+	public static String resolver(HttpServletRequest request) {
 		String peerDireto = request.getRemoteAddr();
 		String encaminhadoPor = request.getHeader("X-Forwarded-For");
 		if (!ehInterno(peerDireto) || encaminhadoPor == null || encaminhadoPor.isBlank()) {

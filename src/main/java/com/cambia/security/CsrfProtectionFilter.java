@@ -62,6 +62,12 @@ class CsrfProtectionFilter extends OncePerRequestFilter {
 		if (METODOS_SEGUROS.contains(request.getMethod()) || AutorizacaoHeader.extrairToken(request) != null) {
 			return false;
 		}
+		// Incremento 79: autenticada pela chave de API (header explícito, que um site de
+		// terceiros não consegue forjar), o cookie que porventura venha junto não foi usado
+		// pra autenticar — não há credencial ambiente sendo explorada.
+		if (ChaveApiAuthenticationFilter.autenticadoPorChave()) {
+			return false;
+		}
 		// Só passa daqui se depende de fato do cookie de sessão pra autenticar — sem esse
 		// cookie (endpoints de pré-login, ou uma requisição sem credencial nenhuma que vai
 		// tomar 401 de qualquer jeito) não há credencial ambiente relevante pro CSRF.

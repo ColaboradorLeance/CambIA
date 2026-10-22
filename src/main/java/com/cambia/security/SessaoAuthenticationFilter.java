@@ -40,6 +40,12 @@ class SessaoAuthenticationFilter extends OncePerRequestFilter {
 	@Override
 	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
 			throws ServletException, IOException {
+		// Incremento 79: se a chave de API já autenticou (filtro anterior), ela é a
+		// identidade desta requisição — um cookie de sessão que venha junto não a substitui.
+		if (ChaveApiAuthenticationFilter.autenticadoPorChave()) {
+			chain.doFilter(request, response);
+			return;
+		}
 		String token = AutorizacaoHeader.extrairToken(request);
 		if (token == null) {
 			token = extrairTokenDoCookie(request);

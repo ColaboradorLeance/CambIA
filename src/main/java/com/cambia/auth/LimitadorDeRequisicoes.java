@@ -35,7 +35,7 @@ import org.springframework.stereotype.Component;
  * curto ainda inflava o mapa livremente entre uma limpeza e outra.
  */
 @Component
-class LimitadorDeRequisicoes {
+public class LimitadorDeRequisicoes {
 
 	private final int maximoPorJanela;
 	private final Duration janela;
@@ -67,7 +67,7 @@ class LimitadorDeRequisicoes {
 	 * já atingiu o limite dentro da janela atual, ou se {@code chave} é nova e o teto de
 	 * chaves rastreadas simultaneamente já foi atingido (ver a classe).
 	 */
-	boolean permitir(String chave) {
+	public boolean permitir(String chave) {
 		Instant agora = Instant.now(relogio);
 		Instant corteDaJanela = agora.minus(janela);
 

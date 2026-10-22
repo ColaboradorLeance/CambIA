@@ -38,7 +38,8 @@ class SecurityConfig {
 
 	@Bean
 	SecurityFilterChain filterChain(HttpSecurity http, SessaoAuthenticationFilter sessaoAuthenticationFilter,
-			CsrfProtectionFilter csrfProtectionFilter) throws Exception {
+			CsrfProtectionFilter csrfProtectionFilter, ChaveApiAuthenticationFilter chaveApiAuthenticationFilter)
+			throws Exception {
 		http
 				// CSRF do Spring Security continua desligado — a partir da Fase 3B a proteção é
 				// feita por um filtro próprio (CsrfProtectionFilter, abaixo), só quando a
@@ -61,8 +62,8 @@ class SecurityConfig {
 						.requestMatchers("/relatorios/**", "/fechamentos/**").hasAnyRole("ADMIN", "ANALISTA")
 						// Cadastros (Cliente/Banco/Modelo de Cálculo): Admin e Analista têm acesso completo
 						.requestMatchers("/clientes/**", "/bancos/**", "/calculos/**").hasAnyRole("ADMIN", "ANALISTA")
-						// Usuários: só Admin
-						.requestMatchers("/usuarios/**").hasRole("ADMIN")
+						// Usuários e Chaves de API (Incremento 79, D1): só Admin
+						.requestMatchers("/usuarios/**", "/chaves-api/**").hasRole("ADMIN")
 						.anyRequest().authenticated())
 				.exceptionHandling(handling -> handling
 						.authenticationEntryPoint((request, response, authException) -> escreverErro(response,
@@ -70,7 +71,9 @@ class SecurityConfig {
 						.accessDeniedHandler((request, response, accessDeniedException) -> escreverErro(response,
 								HttpServletResponse.SC_FORBIDDEN, "Seu perfil não tem permissão para esta ação.")))
 				.addFilterBefore(csrfProtectionFilter, UsernamePasswordAuthenticationFilter.class)
-				.addFilterBefore(sessaoAuthenticationFilter, CsrfProtectionFilter.class);
+				.addFilterBefore(sessaoAuthenticationFilter, CsrfProtectionFilter.class)
+				// Incremento 79: chave de API decide antes da sessão (ver a classe).
+				.addFilterBefore(chaveApiAuthenticationFilter, SessaoAuthenticationFilter.class);
 		return http.build();
 	}
 
