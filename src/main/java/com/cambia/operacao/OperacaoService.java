@@ -199,10 +199,11 @@ class OperacaoService {
 		}
 	}
 
+	// Incremento 78: o número vem de um contador atômico por ano no banco
+	// (id_trade_contadores) — antes era "quantidade de ordens do ano + 1", que repetia
+	// o número sob gravações simultâneas (bug do teste de carga de 2026-10-08).
 	private String gerarIdTrade(int ano) {
-		String prefixo = ano + "-";
-		long proximoSequencial = repository.countByIdTradeStartingWith(prefixo) + 1;
-		return prefixo + "%06d".formatted(proximoSequencial);
+		return ano + "-" + "%06d".formatted(repository.proximoSequencialIdTrade(ano));
 	}
 
 	Operacao buscar(Long id) {

@@ -5,10 +5,21 @@ import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 interface OperacaoRepository extends JpaRepository<Operacao, Long> {
 
-	long countByIdTradeStartingWith(String prefixo);
+	// Incremento 78: incremento atômico do contador do ano no próprio PostgreSQL — o
+	// upsert trava só a linha daquele ano pelo instante do incremento, então gravações
+	// simultâneas nunca recebem o mesmo número (o antigo "count + 1" recebia).
+	// Roda fora de transação própria (autocommit), por isso uma gravação que falhar
+	// DEPOIS de pegar o número deixa um buraco na numeração — mesmo comportamento de
+	// uma sequence do banco, e o preço aceitável por nunca repetir código.
+	@Query(value = """
+			INSERT INTO id_trade_contadores (ano, ultimo) VALUES (:ano, 1)
+			ON CONFLICT (ano) DO UPDATE SET ultimo = id_trade_contadores.ultimo + 1
+			RETURNING ultimo""", nativeQuery = true)
+	long proximoSequencialIdTrade(@Param("ano") int ano);
 
 	List<Operacao> findByData(LocalDate data);
 
