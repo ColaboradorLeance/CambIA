@@ -224,6 +224,37 @@ Copie o valor depois de `token=` e cole no campo "Token" da tela. Sessão dura 8
 
 ---
 
+## Integração via chave de API
+
+Para outro sistema chamar a API do CambIA (ex.: enviar ordens de Câmbio Crédito/Virtual) sem depender de login por e-mail, use uma **chave de API**.
+
+**1. Crie um usuário técnico** em **Cadastros → Usuários** (ex.: "Integração Beyond", perfil **Analista**). Recomendado: um usuário por integração — tudo que a integração fizer aparece no Histórico em nome dele. A chave tem exatamente as permissões do perfil desse usuário (Consultor só lê). Não é possível vincular chave a um Admin.
+
+**2. Crie a chave** em **Cadastros → Chaves de API** (só Admin): nome, usuário vinculado e, opcionalmente, uma data de expiração. A chave completa (`cambia_...`) aparece **uma única vez** — copie e guarde num cofre de senhas ou na configuração segura da integração. O sistema guarda só um hash; se perder, revogue e crie outra.
+
+**3. Envie a chave no header `X-API-Key`** de cada requisição:
+
+```bash
+curl -X POST https://SEU_SERVIDOR/operacoes \
+  -H "X-API-Key: cambia_SUA_CHAVE" \
+  -H "Content-Type: application/json" \
+  -d '{"data":"2026-10-22","clienteId":1,"bancoId":1,"cv":"V",
+       "prCrVir":"Credito","fundo":"M","spreadEmissao":"0.020",
+       "codigoOperacao":"123456","spotAsset":5.1990,"moeda":"USD",
+       "valorMe":1000,"nivelamento":5.1960,"taxaFinal":5.1856}'
+```
+
+A ordem é criada **Em andamento** (resposta `201` já com os valores calculados); para confirmá-la: `PATCH /operacoes/{id}/status` com `{"status":"CONFIRMADO"}`.
+
+| Resposta | Significado |
+|---|---|
+| `401` "Chave de API inválida, revogada ou expirada" | chave errada, revogada na tela, ou passou da data de expiração |
+| `403` "Chave de API não pode gerenciar..." | a chave nunca acessa usuários, chaves de API nem login/sessão |
+| `403` "Seu perfil não tem permissão" | o perfil do usuário vinculado não permite a ação (ex.: Consultor tentando criar ordem) |
+| `429` | muitas tentativas com chave inválida a partir do mesmo IP — aguarde alguns minutos |
+
+Para **revogar** (chave vazada, integração desativada): Cadastros → Chaves de API → **Revogar**. O efeito é imediato e definitivo. A coluna "Último uso" ajuda a identificar chaves esquecidas.
+
 ## Variáveis de ambiente
 
 Todas ficam no arquivo `.env` (passo 2), lido pela flag `--env-file .env` no `docker run` do app (passo 4). Diferente de outras ferramentas, aqui **não existe indireção de valor padrão no `.env`** — o que estiver escrito é exatamente o que a aplicação recebe; os "padrões" mencionados abaixo são valores que a própria aplicação já assume sozinha **quando a variável nem aparece no arquivo** (linha ausente, não uma linha vazia).
