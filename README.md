@@ -246,6 +246,8 @@ curl -X POST https://SEU_SERVIDOR/operacoes \
 
 A ordem é criada **Em andamento** (resposta `201` já com os valores calculados); para confirmá-la: `PATCH /operacoes/{id}/status` com `{"status":"CONFIRMADO"}`.
 
+Para **consultar** ordens, prefira a listagem paginada: `GET /operacoes/pagina?status=CONFIRMADO&pagina=0&tamanho=50` (até 200 por página; aceita os mesmos filtros da tela, ex.: `&moeda=USD&nome=acme`) ou `GET /operacoes?status=ANDAMENTO`. `GET /operacoes` sem parâmetro traz o histórico inteiro e fica mais lento conforme ele cresce.
+
 | Resposta | Significado |
 |---|---|
 | `401` "Chave de API inválida, revogada ou expirada" | chave errada, revogada na tela, ou passou da data de expiração |
