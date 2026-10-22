@@ -134,7 +134,7 @@ function Layout({ children }) {
 					</div>
 					<div className="app-sidebar-brand-text">
 						<span className="app-sidebar-brand-name">CambIA</span>
-						<span className="app-sidebar-version">v{APP_VERSION}</span>
+						<span className="app-sidebar-version" title="Versão do sistema em uso">v{APP_VERSION}</span>
 					</div>
 				</div>
 
