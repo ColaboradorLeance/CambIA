@@ -72,10 +72,10 @@ export default function OperacoesPage() {
 		setCarregando(true);
 		try {
 			if (ehConsultor) {
-				setOperacoes(await api.get("/operacoes"));
+				setOperacoes(await api.get("/operacoes?status=ANDAMENTO"));
 			} else {
 				const [op, cli, ban] = await Promise.all([
-					api.get("/operacoes"),
+					api.get("/operacoes?status=ANDAMENTO"),
 					api.get("/clientes"),
 					api.get("/bancos"),
 				]);

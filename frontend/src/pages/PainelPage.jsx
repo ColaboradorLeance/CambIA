@@ -53,12 +53,13 @@ export default function PainelPage() {
 					api.get("/relatorios/operacoes?periodo=HOJE"),
 					api.get("/relatorios/comparativo?periodo=MES"),
 					api.get("/relatorios/posicao-aberto"),
-					api.get("/operacoes"),
+					api.get("/operacoes/pagina?tamanho=5"),
 				]);
 				setOperacoesHoje(hoje);
 				setComparativoMes(comparativo);
 				setPosicaoAberto(aberto);
-				setUltimasOperacoes([...todas].sort((a, b) => b.id - a.id).slice(0, 5));
+				// Só as 5 mais recentes vêm do servidor (Incremento 80) — antes baixava todas.
+				setUltimasOperacoes(todas.itens);
 			} catch {
 				// erro já mostrado como pop-up pelo api/client.js
 			} finally {

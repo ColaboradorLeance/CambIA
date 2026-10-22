@@ -20,72 +20,74 @@ const FILTROS_VAZIOS = {
 	completadoPor: "",
 };
 
-// Data local (aaaa-mm-dd) do instante de conclusão, no fuso do navegador — pra comparar
-// com o valor de um <input type="date">, que também é sempre local.
-function dataLocalIso(instanteIso) {
-	if (!instanteIso) return null;
-	const d = new Date(instanteIso);
-	const ano = d.getFullYear();
-	const mes = String(d.getMonth() + 1).padStart(2, "0");
-	const dia = String(d.getDate()).padStart(2, "0");
-	return `${ano}-${mes}-${dia}`;
-}
+const TAMANHO_PAGINA = 50;
 
-function contemTexto(valor, filtro) {
-	if (!filtro) return true;
-	return (valor || "").toLowerCase().includes(filtro.toLowerCase());
-}
+// Espera a pessoa parar de digitar antes de consultar o servidor — sem isso, cada tecla
+// num filtro de texto virava uma requisição.
+const ESPERA_DIGITACAO_MS = 350;
+
+const RESULTADO_VAZIO = { itens: [], total: 0, totalPaginas: 0 };
 
 export default function ListagemOrdensPage() {
-	const [operacoes, setOperacoes] = useState([]);
+	// Incremento 80: paginação e filtros no servidor (GET /operacoes/pagina). Antes a tela
+	// baixava TODAS as ordens e filtrava no navegador — custo que crescia com o histórico.
 	const [filtros, setFiltros] = useState(FILTROS_VAZIOS);
+	const [filtrosAplicados, setFiltrosAplicados] = useState(FILTROS_VAZIOS);
+	const [pagina, setPagina] = useState(0);
+	const [resultado, setResultado] = useState(RESULTADO_VAZIO);
+	const [opcoes, setOpcoes] = useState({ moedas: [], fundos: [] });
 	const [carregando, setCarregando] = useState(true);
 
 	useEffect(() => {
+		const espera = setTimeout(() => {
+			setFiltrosAplicados(filtros);
+			setPagina(0);
+		}, ESPERA_DIGITACAO_MS);
+		return () => clearTimeout(espera);
+	}, [filtros]);
+
+	useEffect(() => {
+		// Ignora respostas que chegarem depois de outra consulta já ter sido disparada
+		// (filtro mudou de novo no meio) — senão a tabela mostraria o resultado antigo.
+		let atual = true;
+		const parametros = new URLSearchParams({ status: "CONFIRMADO", pagina, tamanho: TAMANHO_PAGINA });
+		Object.entries(filtrosAplicados).forEach(([campo, valor]) => {
+			if (valor !== "") parametros.set(campo, valor);
+		});
 		async function carregar() {
 			setCarregando(true);
 			try {
-				setOperacoes(await api.get("/operacoes"));
+				const resposta = await api.get(`/operacoes/pagina?${parametros}`);
+				if (atual) setResultado(resposta);
 			} catch {
 				// erro já mostrado como pop-up pelo api/client.js
 			} finally {
-				setCarregando(false);
+				if (atual) setCarregando(false);
 			}
 		}
 		carregar();
+		return () => {
+			atual = false;
+		};
+	}, [filtrosAplicados, pagina]);
+
+	useEffect(() => {
+		// Moeda e Fundo não têm domínio fechado: as opções vêm das ordens confirmadas que
+		// existem no banco (a página atual não tem todas).
+		api.get("/operacoes/opcoes-filtro?status=CONFIRMADO")
+			.then(setOpcoes)
+			.catch(() => {
+				// erro já mostrado como pop-up pelo api/client.js
+			});
 	}, []);
 
 	function atualizarFiltro(campo, valor) {
 		setFiltros((atual) => ({ ...atual, [campo]: valor }));
 	}
 
-	const confirmadas = operacoes.filter((op) => op.status === "CONFIRMADO");
-
-	// Moeda não tem domínio fechado no sistema (suporta qualquer ISO 4217, cadastro
-	// futuro — ver docs/dominio.md) — por isso as opções do <select> vêm das moedas que
-	// realmente aparecem nas ordens já confirmadas, e não de uma lista fixa.
-	const moedasDisponiveis = [...new Set(confirmadas.map((op) => op.moeda).filter(Boolean))].sort();
-
-	// Fundo deixou de ter domínio fechado P/M (Incremento 75) — as opções do filtro vêm
-	// das letras que já aparecem nas ordens carregadas, mesmo critério das moedas.
-	const fundosDisponiveis = [...new Set(confirmadas.map((op) => op.fundo || calcularFundo(op.prCrVir)).filter(Boolean))].sort();
-
-	const filtradas = confirmadas.filter((op) => {
-		if (filtros.dataFechamento && dataLocalIso(op.completadoEm) !== filtros.dataFechamento) return false;
-		if (filtros.moeda && op.moeda !== filtros.moeda) return false;
-		if (filtros.valorMoeda && !formatarMoeda(op.valorMe).includes(filtros.valorMoeda)) return false;
-		if (!contemTexto(op.clienteDocumento, filtros.cnpj)) return false;
-		if (!contemTexto(op.clienteNome, filtros.nome)) return false;
-		if (!contemTexto(op.idTrade, filtros.idTrade)) return false;
-		if (filtros.cv && op.cv !== filtros.cv) return false;
-		if (filtros.tipo && (op.prCrVir || "").toLowerCase() !== filtros.tipo.toLowerCase()) return false;
-		if (!contemTexto(op.bancoNome, filtros.banco)) return false;
-		if (filtros.fundo && (op.fundo || calcularFundo(op.prCrVir)) !== filtros.fundo) return false;
-		if (!contemTexto(op.criadoPorNome, filtros.criadoPor)) return false;
-		if (!contemTexto(op.completadoPorNome, filtros.completadoPor)) return false;
-		return true;
-	});
-
+	const moedasDisponiveis = opcoes.moedas;
+	const fundosDisponiveis = opcoes.fundos;
+	const filtradas = resultado.itens;
 	const algumFiltroAtivo = Object.values(filtros).some((v) => v !== "");
 
 	return (
@@ -205,9 +207,9 @@ export default function ListagemOrdensPage() {
 				)}
 			</div>
 
-			{carregando ? (
+			{carregando && filtradas.length === 0 ? (
 				<LoadingState label="Carregando ordens…" />
-			) : confirmadas.length === 0 ? (
+			) : filtradas.length === 0 && !algumFiltroAtivo ? (
 				<EmptyState
 					title="Nenhuma ordem confirmada"
 					message={'Assim que uma ordem for confirmada na aba "Em andamento", ela aparece aqui.'}
@@ -215,6 +217,7 @@ export default function ListagemOrdensPage() {
 			) : filtradas.length === 0 ? (
 				<EmptyState title="Nenhuma ordem encontrada" message="Ajuste os filtros acima e tente novamente." />
 			) : (
+				<>
 				<div className="table-card">
 					<table>
 						<thead>
@@ -285,6 +288,28 @@ export default function ListagemOrdensPage() {
 						</tbody>
 					</table>
 				</div>
+				<div className="paginacao" style={{ display: "flex", gap: 12, alignItems: "center", margin: "12px 0" }}>
+					<button
+						type="button"
+						className="btn btn-secondary btn-sm"
+						disabled={pagina === 0 || carregando}
+						onClick={() => setPagina((p) => p - 1)}
+					>
+						Anterior
+					</button>
+					<span>
+						Página {pagina + 1} de {Math.max(resultado.totalPaginas, 1)} · {resultado.total} ordens
+					</span>
+					<button
+						type="button"
+						className="btn btn-secondary btn-sm"
+						disabled={pagina + 1 >= resultado.totalPaginas || carregando}
+						onClick={() => setPagina((p) => p + 1)}
+					>
+						Próxima
+					</button>
+				</div>
+				</>
 			)}
 		</div>
 	);
