@@ -7,6 +7,7 @@ import ClientesPage from "./pages/ClientesPage";
 import BancosPage from "./pages/BancosPage";
 import CalculosPage from "./pages/CalculosPage";
 import UsuariosPage from "./pages/UsuariosPage";
+import ChavesApiPage from "./pages/ChavesApiPage";
 import OperacoesPage from "./pages/OperacoesPage";
 import ListagemOrdensPage from "./pages/ListagemOrdensPage";
 import FechamentoPage from "./pages/FechamentoPage";
@@ -79,6 +80,7 @@ const ABAS_CADASTROS = [
 	{ to: "/cadastros/bancos", label: "Bancos" },
 	{ to: "/cadastros/calculos", label: "Modelos de Cálculo" },
 	{ to: "/cadastros/usuarios", label: "Usuários", roles: ["ADMIN"] },
+	{ to: "/cadastros/chaves-api", label: "Chaves de API", roles: ["ADMIN"] },
 ];
 
 const NAV_GROUPS = [
@@ -303,6 +305,15 @@ export default function App() {
 					<Pagina roles={["ADMIN"]}>
 						<SubNav itens={ABAS_CADASTROS} />
 						<UsuariosPage />
+					</Pagina>
+				}
+			/>
+			<Route
+				path="/cadastros/chaves-api"
+				element={
+					<Pagina roles={["ADMIN"]}>
+						<SubNav itens={ABAS_CADASTROS} />
+						<ChavesApiPage />
 					</Pagina>
 				}
 			/>
