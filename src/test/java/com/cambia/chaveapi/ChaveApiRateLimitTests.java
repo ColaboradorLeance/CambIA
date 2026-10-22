@@ -15,20 +15,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * Incremento 79 (A10 de docs/chaves-api-plano.md): tentativas com chave inválida passam
- * pelo LimitadorDeRequisicoes por IP. Classe separada de ChaveApiAutenticacaoTests porque
+ * por um limitador por IP próprio da chave de API (separado do login — ver
+ * ChaveApiLimitadorIsoladoTests). Classe separada de ChaveApiAutenticacaoTests porque
  * precisa de um limite baixo, e a suíte inteira roda com o limite alto
- * (src/test/resources/application.properties). A janela de 17 minutos não tem significado
- * de negócio: só deixa a combinação de propriedades diferente da de
- * AuthRateLimitControllerTests, pra este teste ganhar um contexto Spring (e um limitador)
- * próprio, sem herdar as tentativas contadas por aquela classe.
+ * (src/test/resources/application.properties).
  */
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest
 @AutoConfigureMockMvc
-@TestPropertySource(properties = {
-		"cambia.rate-limit.auth.maximo=5",
-		"cambia.rate-limit.auth.janela-minutos=17"
-})
+@TestPropertySource(properties = "cambia.rate-limit.chave-api.maximo=5")
 class ChaveApiRateLimitTests {
 
 	@Autowired

@@ -133,7 +133,7 @@ class FechamentoService {
 	}
 
 	private PosicaoEmAberto calcularPosicaoEmAberto() {
-		List<Operacao> emAndamento = operacaoRepository.findByStatus(StatusOperacao.ANDAMENTO);
+		List<Operacao> emAndamento = operacaoRepository.findByStatusOrderByIdAsc(StatusOperacao.ANDAMENTO);
 
 		Map<String, BigDecimal> exposicaoPorMoeda = new LinkedHashMap<>();
 		for (Operacao operacao : emAndamento) {

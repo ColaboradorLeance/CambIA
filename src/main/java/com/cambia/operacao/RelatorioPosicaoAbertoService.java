@@ -5,6 +5,7 @@ import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,7 +32,15 @@ class RelatorioPosicaoAbertoService {
 	}
 
 	PosicaoAbertoResponse calcular(LocalDate hoje) {
-		List<Operacao> abertas = operacaoRepository.findByStatus(StatusOperacao.ANDAMENTO);
+		List<Operacao> abertas = operacaoRepository.findByStatusOrderByIdAsc(StatusOperacao.ANDAMENTO);
+
+		// Cache só desta chamada: o mesmo nome aparece várias vezes (lista + duas
+		// exposições, uma vez por ordem aberta) — antes era uma consulta a cada vez. Local
+		// de propósito: um cache no bean guardaria nome desatualizado entre requisições.
+		Map<Long, String> nomesCliente = new HashMap<>();
+		Map<Long, String> nomesBanco = new HashMap<>();
+		Function<Long, String> nomeCliente = id -> nomesCliente.computeIfAbsent(id, this::buscarNomeCliente);
+		Function<Long, String> nomeBanco = id -> nomesBanco.computeIfAbsent(id, this::buscarNomeBanco);
 
 		List<OperacaoEmAberto> operacoes = abertas.stream()
 				.map(op -> new OperacaoEmAberto(
@@ -39,8 +48,8 @@ class RelatorioPosicaoAbertoService {
 						op.getIdTrade(),
 						op.getData(),
 						ChronoUnit.DAYS.between(op.getData(), hoje),
-						resolverNomeCliente(op.getClienteId()),
-						resolverNomeBanco(op.getBancoId()),
+						nomeCliente.apply(op.getClienteId()),
+						nomeBanco.apply(op.getBancoId()),
 						op.getMoeda(),
 						op.getValorMe()))
 				.sorted(Comparator.comparingLong(OperacaoEmAberto::diasEmAberto).reversed())
@@ -51,8 +60,8 @@ class RelatorioPosicaoAbertoService {
 			exposicaoPorMoeda.merge(op.getMoeda(), op.getValorMe(), BigDecimal::add);
 		}
 
-		List<ExposicaoItem> exposicaoPorCliente = agruparExposicao(abertas, op -> resolverNomeCliente(op.getClienteId()));
-		List<ExposicaoItem> exposicaoPorBanco = agruparExposicao(abertas, op -> resolverNomeBanco(op.getBancoId()));
+		List<ExposicaoItem> exposicaoPorCliente = agruparExposicao(abertas, op -> nomeCliente.apply(op.getClienteId()));
+		List<ExposicaoItem> exposicaoPorBanco = agruparExposicao(abertas, op -> nomeBanco.apply(op.getBancoId()));
 
 		return new PosicaoAbertoResponse(abertas.size(), operacoes, exposicaoPorMoeda, exposicaoPorCliente,
 				exposicaoPorBanco);
@@ -76,11 +85,11 @@ class RelatorioPosicaoAbertoService {
 		return itens;
 	}
 
-	private String resolverNomeCliente(Long clienteId) {
+	private String buscarNomeCliente(Long clienteId) {
 		return clienteRepository.findNomeById(clienteId).orElse("Cliente #" + clienteId);
 	}
 
-	private String resolverNomeBanco(Long bancoId) {
+	private String buscarNomeBanco(Long bancoId) {
 		return bancoRepository.findNomeById(bancoId).orElse("Banco #" + bancoId);
 	}
 

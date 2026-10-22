@@ -12,7 +12,9 @@ public class TestcontainersConfiguration {
 	@Bean
 	@ServiceConnection
 	public PostgreSQLContainer postgresContainer() {
-		return new PostgreSQLContainer(DockerImageName.parse("postgres:latest"));
+		// Mesma versão de produção (docker-compose.yml e README): com "latest" os testes
+		// rodavam numa versão mais nova e uma diferença de comportamento passaria batida.
+		return new PostgreSQLContainer(DockerImageName.parse("postgres:16"));
 	}
 
 }

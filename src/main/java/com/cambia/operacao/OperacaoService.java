@@ -215,6 +215,10 @@ class OperacaoService {
 		return repository.findAll();
 	}
 
+	List<Operacao> listarPorStatus(StatusOperacao status) {
+		return repository.findByStatusOrderByIdAsc(status);
+	}
+
 	List<Operacao> relatorioOperacoes(Periodo periodo, Long clienteId, Long bancoId, String moeda, String cv,
 			StatusOperacao status, Long criadoPorUsuarioId, Long completadoPorUsuarioId, LocalDate hoje) {
 		IntervaloDatas intervalo = PeriodoResolver.resolver(periodo, hoje);

@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 
-import com.cambia.auth.LimitadorDeRequisicoes;
 import com.cambia.auth.ResolvedorDeIpReal;
 import com.cambia.chaveapi.ChaveApiService;
 import com.cambia.usuario.Usuario;
@@ -44,9 +43,9 @@ class ChaveApiAuthenticationFilter extends OncePerRequestFilter {
 	private static final List<String> CAMINHOS_PROIBIDOS = List.of("/usuarios", "/chaves-api", "/auth");
 
 	private final ChaveApiService chaveApiService;
-	private final LimitadorDeRequisicoes limitador;
+	private final LimitadorTentativasChaveApi limitador;
 
-	ChaveApiAuthenticationFilter(ChaveApiService chaveApiService, LimitadorDeRequisicoes limitador) {
+	ChaveApiAuthenticationFilter(ChaveApiService chaveApiService, LimitadorTentativasChaveApi limitador) {
 		this.chaveApiService = chaveApiService;
 		this.limitador = limitador;
 	}
@@ -66,7 +65,7 @@ class ChaveApiAuthenticationFilter extends OncePerRequestFilter {
 			// profundidade (responde 429 a quem insiste). Só tentativas INVÁLIDAS contam —
 			// integração legítima nunca esbarra nele —, por isso a checagem vem depois do
 			// lookup: ela não poupa a consulta ao banco de quem já foi bloqueado.
-			if (!limitador.permitir("chave-api:" + ResolvedorDeIpReal.resolver(request))) {
+			if (!limitador.permitir(ResolvedorDeIpReal.resolver(request))) {
 				escreverErro(response, 429, "Muitas tentativas com chave de API inválida. Aguarde alguns minutos.");
 				return;
 			}

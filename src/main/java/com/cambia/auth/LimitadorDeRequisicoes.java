@@ -55,7 +55,7 @@ public class LimitadorDeRequisicoes {
 		this(maximoPorJanela, janela, 50_000, relogio);
 	}
 
-	LimitadorDeRequisicoes(int maximoPorJanela, Duration janela, int maximoChavesRastreadas, Clock relogio) {
+	public LimitadorDeRequisicoes(int maximoPorJanela, Duration janela, int maximoChavesRastreadas, Clock relogio) {
 		this.maximoPorJanela = maximoPorJanela;
 		this.janela = janela;
 		this.maximoChavesRastreadas = maximoChavesRastreadas;
@@ -107,7 +107,7 @@ public class LimitadorDeRequisicoes {
 	// larga a trava do mapa antes de entrar no synchronized), então não há risco de
 	// deadlock entre este método e permitir() rodando em paralelo.
 	@Scheduled(fixedDelay = 5, timeUnit = java.util.concurrent.TimeUnit.MINUTES)
-	void limparChavesExpiradas() {
+	public void limparChavesExpiradas() {
 		Instant corteDaJanela = Instant.now(relogio).minus(janela);
 		for (String chave : historico.keySet()) {
 			historico.compute(chave, (k, tentativas) -> {

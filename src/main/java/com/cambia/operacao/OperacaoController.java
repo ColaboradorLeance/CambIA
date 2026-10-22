@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -23,9 +24,11 @@ import org.springframework.web.bind.annotation.RestController;
 class OperacaoController {
 
 	private final OperacaoService service;
+	private final OperacaoPaginacaoService paginacaoService;
 
-	OperacaoController(OperacaoService service) {
+	OperacaoController(OperacaoService service, OperacaoPaginacaoService paginacaoService) {
 		this.service = service;
+		this.paginacaoService = paginacaoService;
 	}
 
 	@PostMapping
@@ -52,9 +55,22 @@ class OperacaoController {
 		return service.toResponse(service.editar(id, request, usuarioLogado.getId()));
 	}
 
+	// Sem parâmetro, continua trazendo todas (compatibilidade com integrações); as telas
+	// usam ?status= (Em andamento) ou /pagina (Confirmadas, Painel) — Incremento 80.
 	@GetMapping
-	List<OperacaoResponse> listar() {
-		return service.toResponses(service.listar());
+	List<OperacaoResponse> listar(@RequestParam(required = false) StatusOperacao status) {
+		return service.toResponses(status == null ? service.listar() : service.listarPorStatus(status));
+	}
+
+	@GetMapping("/pagina")
+	PaginaResponse<OperacaoResponse> pagina(FiltroOperacoes filtro, @RequestParam(defaultValue = "0") int pagina,
+			@RequestParam(defaultValue = "50") int tamanho) {
+		return paginacaoService.paginar(filtro, pagina, tamanho);
+	}
+
+	@GetMapping("/opcoes-filtro")
+	OpcoesFiltroResponse opcoesFiltro(@RequestParam StatusOperacao status) {
+		return paginacaoService.opcoesDeFiltro(status);
 	}
 
 	@PatchMapping("/{id}/status")

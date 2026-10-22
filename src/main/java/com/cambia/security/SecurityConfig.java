@@ -9,10 +9,15 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.authorization.AuthorityAuthorizationManager;
+import org.springframework.security.authorization.AuthorizationDecision;
+import org.springframework.security.authorization.AuthorizationManager;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.RequestAuthorizationContext;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -49,7 +54,15 @@ class SecurityConfig {
 				.cors(cors -> cors.configurationSource(corsConfigurationSource()))
 				.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 				.authorizeHttpRequests(auth -> auth
-						.requestMatchers("/auth/**", "/actuator/health", "/error").permitAll()
+						// D7 (Incremento 79/80): chave de API nunca alcança login/sessão, usuários nem
+						// chaves. O ChaveApiAuthenticationFilter já barra antes, com mensagem
+						// específica; estas regras são a segunda camada, com o MESMO matcher da
+						// autorização (caminho já normalizado) — uma divergência de normalização
+						// que escape do filtro ainda para aqui. Vêm antes do permitAll de /auth.
+						.requestMatchers("/auth/**").access(semChaveDeApi(PERMITIR_TODOS))
+						.requestMatchers("/usuarios/**", "/chaves-api/**")
+								.access(semChaveDeApi(AuthorityAuthorizationManager.hasRole("ADMIN")))
+						.requestMatchers("/actuator/health", "/error").permitAll()
 						// Operações: Consultor só consulta; Admin e Analista criam, editam e completam
 						.requestMatchers(HttpMethod.GET, "/operacoes/**").authenticated()
 						.requestMatchers(HttpMethod.POST, "/operacoes").hasAnyRole("ADMIN", "ANALISTA")
@@ -62,8 +75,6 @@ class SecurityConfig {
 						.requestMatchers("/relatorios/**", "/fechamentos/**").hasAnyRole("ADMIN", "ANALISTA")
 						// Cadastros (Cliente/Banco/Modelo de Cálculo): Admin e Analista têm acesso completo
 						.requestMatchers("/clientes/**", "/bancos/**", "/calculos/**").hasAnyRole("ADMIN", "ANALISTA")
-						// Usuários e Chaves de API (Incremento 79, D1): só Admin
-						.requestMatchers("/usuarios/**", "/chaves-api/**").hasRole("ADMIN")
 						.anyRequest().authenticated())
 				.exceptionHandling(handling -> handling
 						.authenticationEntryPoint((request, response, authException) -> escreverErro(response,
@@ -75,6 +86,20 @@ class SecurityConfig {
 				// Incremento 79: chave de API decide antes da sessão (ver a classe).
 				.addFilterBefore(chaveApiAuthenticationFilter, SessaoAuthenticationFilter.class);
 		return http.build();
+	}
+
+	private static final AuthorizationManager<RequestAuthorizationContext> PERMITIR_TODOS =
+			(autenticacao, contexto) -> new AuthorizationDecision(true);
+
+	// Nega quando quem autenticou foi uma chave de API; senão, delega pra regra normal.
+	private static AuthorizationManager<RequestAuthorizationContext> semChaveDeApi(
+			AuthorizationManager<RequestAuthorizationContext> regra) {
+		return (autenticacao, contexto) -> {
+			Authentication atual = autenticacao.get();
+			boolean viaChave = atual != null && atual.getAuthorities().stream()
+					.anyMatch(autoridade -> ChaveApiAuthenticationFilter.AUTORIDADE.equals(autoridade.getAuthority()));
+			return viaChave ? new AuthorizationDecision(false) : regra.authorize(autenticacao, contexto);
+		};
 	}
 
 	// Corpo de erro (não vazio) pra 401/403, no mesmo formato "detail" usado pelos outros
