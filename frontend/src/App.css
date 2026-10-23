@@ -162,6 +162,17 @@
 	min-width: 0;
 }
 
+/* Incremento 81: o bloco do usuário virou link para "Meu perfil" — mantém o visual de antes. */
+a.app-user-info {
+	color: inherit;
+	text-decoration: none;
+	border-radius: 6px;
+}
+
+a.app-user-info:hover .app-user-name {
+	text-decoration: underline;
+}
+
 .app-user-name {
 	font-size: 13px;
 	font-weight: 600;
@@ -1366,4 +1377,81 @@ p.erro {
 	.fechamento-grid {
 		grid-template-columns: 1fr 1fr;
 	}
+}
+
+/* Incremento 84: banco com um ou mais modelos de cálculo */
+.banco-calculos {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	margin: 0;
+	padding: 12px 14px;
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+}
+
+.banco-calculos legend {
+	padding: 0 6px;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--text-secondary);
+}
+
+.banco-calculos label {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 13.5px;
+	font-weight: 500;
+	color: var(--text);
+}
+
+.banco-calculos input[type="checkbox"] {
+	width: auto;
+}
+
+/* Busca por nome acima da tabela de um cadastro */
+.busca-cadastro {
+	max-width: 320px;
+	margin-bottom: 12px;
+}
+
+.busca-cadastro-vazio {
+	color: var(--text-muted);
+	text-align: center;
+}
+
+/* Incremento 87: nome do modelo de cálculo nas tabelas de ordens, com pop-up da fórmula */
+.modelo-calculo {
+	cursor: help;
+	border-bottom: 1px dashed var(--text-muted);
+	white-space: nowrap;
+}
+
+.modelo-calculo-pop {
+	position: fixed;
+	z-index: 50;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	width: 320px;
+	box-sizing: border-box;
+	padding: 10px 12px;
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	box-shadow: var(--shadow-md);
+	white-space: normal;
+	pointer-events: none;
+}
+
+.modelo-calculo-pop-titulo {
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--text-secondary);
+}
+
+.modelo-calculo-pop-legenda {
+	font-size: 11.5px;
+	color: var(--text-muted);
 }

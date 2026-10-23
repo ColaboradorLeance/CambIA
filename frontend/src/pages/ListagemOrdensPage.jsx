@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import LoadingState from "../components/LoadingState";
 import EmptyState from "../components/EmptyState";
+import ModeloCalculo from "../components/ModeloCalculo";
 import { formatarData, formatarDataHora } from "../utils/data";
 import { formatarMoeda, formatarPercentual, formatarSpreadEmissao, calcularFundo } from "../utils/formatacao";
 
@@ -228,6 +229,7 @@ export default function ListagemOrdensPage() {
 								<th>Cliente</th>
 								<th>CNPJ/CPF</th>
 								<th>Banco</th>
+								<th>Modelo de cálculo</th>
 								<th>C/V</th>
 								<th>Tipo Ordem</th>
 								<th>Valor em moeda</th>
@@ -259,6 +261,9 @@ export default function ListagemOrdensPage() {
 									<td>{op.clienteNome || `#${op.clienteId}`}</td>
 									<td>{op.clienteDocumento || "—"}</td>
 									<td>{op.bancoNome || `#${op.bancoId}`}</td>
+									<td>
+										<ModeloCalculo nome={op.calculoNome} formula={op.calculoFormula} />
+									</td>
 									<td>{op.cv}</td>
 									<td>{op.prCrVir}</td>
 									<td className="mono">{formatarMoeda(op.valorMe)}</td>

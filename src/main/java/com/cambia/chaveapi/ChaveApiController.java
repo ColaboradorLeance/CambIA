@@ -1,25 +1,24 @@
 package com.cambia.chaveapi;
 
-import java.net.URI;
 import java.util.List;
-
-import jakarta.validation.Valid;
 
 import com.cambia.usuario.Usuario;
 
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Só Admin (D1) — a restrição fica no SecurityConfig, junto das demais regras de acesso. */
+/**
+ * Tela do Admin: todas as chaves, com o dono, e revogação de qualquer uma (K7 —
+ * emergência: chave vazada de quem saiu ou está ausente). Não cria chave para outro
+ * usuário: desde o Incremento 81 cada um cria a sua em /perfil/chaves-api (K1). A
+ * restrição a Admin fica no SecurityConfig, junto das demais regras de acesso.
+ */
 @RestController
 @RequestMapping("/chaves-api")
 class ChaveApiController {
@@ -30,22 +29,15 @@ class ChaveApiController {
 		this.service = service;
 	}
 
-	@PostMapping
-	ResponseEntity<ChaveApiCriadaResponse> criar(@Valid @RequestBody ChaveApiRequest request,
-			@AuthenticationPrincipal Usuario usuarioLogado) {
-		ChaveApiCriadaResponse criada = service.criar(request, usuarioLogado.getId());
-		return ResponseEntity.created(URI.create("/chaves-api/" + criada.id())).body(criada);
-	}
-
 	@GetMapping
 	List<ChaveApiResponse> listar() {
-		return service.listar();
+		return service.listarTodas();
 	}
 
 	@DeleteMapping("/{id}")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	void revogar(@PathVariable Long id, @AuthenticationPrincipal Usuario usuarioLogado) {
-		service.revogar(id, usuarioLogado.getId());
+		service.revogarQualquer(id, usuarioLogado.getId());
 	}
 
 }

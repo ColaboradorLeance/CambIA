@@ -1,6 +1,7 @@
 package com.cambia.banco;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 record BancoResponse(
 		Long id,
@@ -8,9 +9,11 @@ record BancoResponse(
 		String sigla,
 		String nome,
 		BigDecimal taxaRebate,
-		Long calculoId,
-		String calculoNome,
-		String calculoFormula) {
+		List<CalculoDoBanco> calculos) {
+
+	/** Modelo de cálculo como aparece no banco (Incremento 84; ativo desde o 85). */
+	record CalculoDoBanco(Long id, String nome, String formula, boolean ativo) {
+	}
 
 	static BancoResponse from(Banco banco) {
 		return new BancoResponse(
@@ -19,9 +22,10 @@ record BancoResponse(
 				banco.getSigla(),
 				banco.getNome(),
 				banco.getTaxaRebate(),
-				banco.getCalculo().getId(),
-				banco.getCalculo().getNome(),
-				banco.getCalculo().getFormula());
+				banco.getCalculos().stream()
+						.map(calculo -> new CalculoDoBanco(calculo.getId(), calculo.getNome(), calculo.getFormula(),
+								calculo.isAtivo()))
+						.toList());
 	}
 
 }

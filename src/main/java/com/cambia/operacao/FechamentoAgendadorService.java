@@ -7,6 +7,9 @@ import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 
+import com.cambia.exportacao.RelatorioExcelExporter;
+import com.cambia.exportacao.RelatorioPdfExporter;
+import com.cambia.exportacao.RelatorioTabular;
 import com.cambia.usuario.Usuario;
 import com.cambia.usuario.UsuarioRepository;
 
@@ -22,17 +25,20 @@ class FechamentoAgendadorService {
 	private final UsuarioRepository usuarioRepository;
 	private final FechamentoService fechamentoService;
 	private final Optional<FechamentoEmailService> emailService;
+	private final RelatorioExportacaoService exportacaoService;
 
 	FechamentoAgendadorService(ConfiguracaoFechamentoRepository configuracaoRepository,
 			FechamentoGeradoRepository fechamentoGeradoRepository,
 			FechamentoDestinatarioRepository destinatarioRepository, UsuarioRepository usuarioRepository,
-			FechamentoService fechamentoService, Optional<FechamentoEmailService> emailService) {
+			FechamentoService fechamentoService, Optional<FechamentoEmailService> emailService,
+			RelatorioExportacaoService exportacaoService) {
 		this.configuracaoRepository = configuracaoRepository;
 		this.fechamentoGeradoRepository = fechamentoGeradoRepository;
 		this.destinatarioRepository = destinatarioRepository;
 		this.usuarioRepository = usuarioRepository;
 		this.fechamentoService = fechamentoService;
 		this.emailService = emailService;
+		this.exportacaoService = exportacaoService;
 	}
 
 	@Scheduled(cron = "0 * * * * *")
@@ -63,10 +69,12 @@ class FechamentoAgendadorService {
 		FechamentoResponse fechamento = fechamentoService.calcular(data);
 		Instant geradoEm = agora.atZone(java.time.ZoneId.systemDefault()).toInstant();
 
-		byte[] pdf = FechamentoPdfExporter.gerar(fechamento);
+		// Incremento 83: mesmo exportador (e visual) do download e dos relatórios.
+		RelatorioTabular arquivo = exportacaoService.fechamento(fechamento);
+		byte[] pdf = RelatorioPdfExporter.gerar(arquivo);
 		fechamentoGeradoRepository.save(new FechamentoGerado(data, "PDF", "fechamento-" + data + ".pdf", pdf, geradoEm));
 
-		byte[] excel = FechamentoExcelExporter.gerar(fechamento);
+		byte[] excel = RelatorioExcelExporter.gerar(arquivo);
 		fechamentoGeradoRepository
 				.save(new FechamentoGerado(data, "XLSX", "fechamento-" + data + ".xlsx", excel, geradoEm));
 

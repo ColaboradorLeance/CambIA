@@ -10,6 +10,8 @@ import java.util.Optional;
 
 import com.cambia.banco.BancoRepository;
 import com.cambia.banco.BancoResumo;
+import com.cambia.banco.CalculoRepository;
+import com.cambia.banco.CalculoResumo;
 import com.cambia.cliente.ClienteRepository;
 import com.cambia.cliente.ClienteResumo;
 import com.cambia.usuario.UsuarioRepository;
@@ -24,20 +26,23 @@ class OperacaoService {
 	private final OperacaoRepository repository;
 	private final ClienteRepository clienteRepository;
 	private final BancoRepository bancoRepository;
+	private final CalculoRepository calculoRepository;
 	private final UsuarioRepository usuarioRepository;
 	private final OperacaoEventoService eventoService;
 
 	OperacaoService(OperacaoRepository repository, ClienteRepository clienteRepository,
-			BancoRepository bancoRepository, UsuarioRepository usuarioRepository,
-			OperacaoEventoService eventoService) {
+			BancoRepository bancoRepository, CalculoRepository calculoRepository,
+			UsuarioRepository usuarioRepository, OperacaoEventoService eventoService) {
 		this.repository = repository;
 		this.clienteRepository = clienteRepository;
 		this.bancoRepository = bancoRepository;
+		this.calculoRepository = calculoRepository;
 		this.usuarioRepository = usuarioRepository;
 		this.eventoService = eventoService;
 	}
 
-	Operacao criar(OperacaoRequest request, Long criadoPorUsuarioId) {
+	/** @param chaveApiId chave de API que criou a ordem (Incremento 81, K9); null = pela tela. */
+	Operacao criar(OperacaoRequest request, Long criadoPorUsuarioId, Long chaveApiId) {
 		if (!clienteRepository.existsById(request.clienteId())) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cliente informado não existe");
 		}
@@ -49,18 +54,21 @@ class OperacaoService {
 		String fundo = validarFundo(prCrVir, request.fundo());
 		String codigoOperacao = validarCodigoOperacao(prCrVir, request.codigoOperacao());
 		validarSpotAsset(prCrVir, request.spotAsset());
+		Long calculoId = chaveApiId == null ? resolverCalculo(request.bancoId(), request.calculoId(), null)
+				: calculoDaOrdemViaApi(request.bancoId());
 
 		String idTrade = gerarIdTrade(request.data().getYear());
 		Instant agora = Instant.now();
 
 		Operacao operacao = new Operacao(idTrade, request.data(), request.codigoBanco(), codigoOperacao,
-				request.clienteId(), request.bancoId(), request.cv(), prCrVir, fundo,
+				request.clienteId(), request.bancoId(), calculoId, request.cv(), prCrVir, fundo,
 				request.spreadEmissao(), request.moeda(), request.valorMe(), request.spotAsset(),
 				request.nivelamento(), request.taxaFinal(), criadoPorUsuarioId, agora);
 		operacao = repository.save(operacao);
 
 		eventoService.registrar(TipoEventoOperacao.CRIADA, operacao.getId(), criadoPorUsuarioId, agora,
-				OperacaoSnapshot.de(operacao, nomeCliente(operacao.getClienteId()), nomeBanco(operacao.getBancoId())));
+				snapshot(operacao),
+				chaveApiId);
 		return operacao;
 	}
 
@@ -80,10 +88,12 @@ class OperacaoService {
 		String fundo = validarFundo(prCrVir, request.fundo());
 		String codigoOperacao = validarCodigoOperacao(prCrVir, request.codigoOperacao());
 		validarSpotAsset(prCrVir, request.spotAsset());
+		Long calculoId = resolverCalculo(request.bancoId(), request.calculoId(),
+				operacao.getBancoId().equals(request.bancoId()) ? operacao.getCalculoId() : null);
 
-		OperacaoSnapshot dadosAnteriores = OperacaoSnapshot.de(operacao, nomeCliente(operacao.getClienteId()),
-				nomeBanco(operacao.getBancoId()));
-		operacao.editar(request.codigoBanco(), codigoOperacao, request.clienteId(), request.bancoId(), request.cv(),
+		OperacaoSnapshot dadosAnteriores = snapshot(operacao);
+		operacao.editar(request.codigoBanco(), codigoOperacao, request.clienteId(), request.bancoId(), calculoId,
+				request.cv(),
 				prCrVir, fundo, request.spreadEmissao(), request.moeda(), request.valorMe(),
 				request.spotAsset(), request.nivelamento(), request.taxaFinal());
 		operacao = repository.save(operacao);
@@ -91,6 +101,50 @@ class OperacaoService {
 		eventoService.registrar(TipoEventoOperacao.EDITADA, operacao.getId(), usuarioId, Instant.now(),
 				dadosAnteriores);
 		return operacao;
+	}
+
+	/**
+	 * Incremento 84: qual modelo de cálculo do banco a ordem usa. Banco com um só → ele, sem
+	 * precisar informar; com mais de um → a escolha é obrigatória (400 sem ela, decisão do
+	 * PO). O informado tem que ser do banco — exceto, na edição sem troca de banco, o que a
+	 * ordem já usava: ele pode ter saído do banco e a ordem continua com ele (decisão do PO).
+	 *
+	 * @param calculoAtual cálculo que a ordem já tem no MESMO banco (edição), ou null
+	 */
+	//
+	// Incremento 85: só os cálculos ATIVOS do banco contam como opção — inativo segue no
+	// banco, mas a ordem que já o usa é a única que pode continuar com ele (decisão do PO).
+	private Long resolverCalculo(Long bancoId, Long calculoInformado, Long calculoAtual) {
+		List<Long> ativos = bancoRepository.findCalculoAtivoIdsById(bancoId);
+		if (calculoInformado == null) {
+			if (ativos.size() == 1) {
+				return ativos.get(0);
+			}
+			if (ativos.isEmpty()) {
+				throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+						"Este banco não tem modelo de cálculo ativo — reative um ou marque outro no banco");
+			}
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+					"Este banco tem mais de um modelo de cálculo — informe qual usar (calculoId)");
+		}
+		if (ativos.contains(calculoInformado) || calculoInformado.equals(calculoAtual)) {
+			return calculoInformado;
+		}
+		if (bancoRepository.findCalculoIdsById(bancoId).contains(calculoInformado)) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "O modelo de cálculo informado está inativo");
+		}
+		throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+				"O modelo de cálculo informado não pertence a este banco");
+	}
+
+	/**
+	 * Incremento 86 (decisões do PO): pela API o modelo é escolhido na plataforma, não pela
+	 * integração — o calculoId enviado é ignorado. Banco com um só modelo ativo já entra com
+	 * ele; senão a ordem entra sem modelo e só confirma depois que alguém escolher na tela.
+	 */
+	private Long calculoDaOrdemViaApi(Long bancoId) {
+		List<Long> ativos = bancoRepository.findCalculoAtivoIdsById(bancoId);
+		return ativos.size() == 1 ? ativos.get(0) : null;
 	}
 
 	// Incremento 77 (pendência #16, achado da revisão de 2026-10-08): PR/CR/VIR deixou de
@@ -238,6 +292,10 @@ class OperacaoService {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
 					"Uma ordem em andamento só pode ser confirmada ou cancelada");
 		}
+		if (novoStatus == StatusOperacao.CONFIRMADO && operacao.getCalculoId() == null) {
+			throw new ResponseStatusException(HttpStatus.CONFLICT,
+					"Escolha o modelo de cálculo da ordem (editar) antes de confirmar");
+		}
 
 		Instant agora = Instant.now();
 		operacao.atualizarStatus(novoStatus, usuarioId, agora);
@@ -268,6 +326,7 @@ class OperacaoService {
 		Map<Long, Optional<String>> nomesUsuario = new HashMap<>();
 		Map<Long, Optional<ClienteResumo>> clientes = new HashMap<>();
 		Map<Long, Optional<BancoResumo>> bancos = new HashMap<>();
+		Map<Long, Optional<CalculoResumo>> calculos = new HashMap<>();
 
 		return operacoes.stream().map(operacao -> {
 			String criadoPorNome = nomesUsuario
@@ -283,6 +342,9 @@ class OperacaoService {
 					.computeIfAbsent(operacao.getClienteId(), clienteRepository::findResumoById);
 			Optional<BancoResumo> banco = bancos
 					.computeIfAbsent(operacao.getBancoId(), bancoRepository::findResumoById);
+			// Incremento 84: a fórmula é a do cálculo escolhido NA ORDEM; o rebate segue do banco.
+			Optional<CalculoResumo> calculo = operacao.getCalculoId() == null ? Optional.empty()
+					: calculos.computeIfAbsent(operacao.getCalculoId(), calculoRepository::findResumoById);
 
 			// Incremento 76 (substitui a regra do Incremento 39, que suprimia os valores
 			// fora de CONFIRMADO): os valores calculados existem SEMPRE, em qualquer
@@ -291,12 +353,19 @@ class OperacaoService {
 			// confirmar continua travando a ordem (e com ela os valores).
 			ValoresCalculados valores = OperacaoCalculo.calcular(operacao.getValorMe(), operacao.getSpotAsset(),
 					operacao.getNivelamento(), operacao.getTaxaFinal(), operacao.getCv(), operacao.getPrCrVir(),
-					operacao.getSpreadEmissao(), banco.map(BancoResumo::formula).orElse(null),
+					operacao.getSpreadEmissao(), calculo.map(CalculoResumo::formula).orElse(null),
 					banco.map(BancoResumo::taxaRebate).orElse(null));
 			return OperacaoResponse.from(operacao, valores, criadoPorNome, completadoPorNome,
 					cliente.map(ClienteResumo::nome).orElse(null), cliente.map(ClienteResumo::documento).orElse(null),
-					banco.map(BancoResumo::nome).orElse(null));
+					banco.map(BancoResumo::nome).orElse(null), calculo.map(CalculoResumo::nome).orElse(null),
+					calculo.map(CalculoResumo::formula).orElse(null));
 		}).toList();
+	}
+
+	private OperacaoSnapshot snapshot(Operacao operacao) {
+		return OperacaoSnapshot.de(operacao, nomeCliente(operacao.getClienteId()), nomeBanco(operacao.getBancoId()),
+				operacao.getCalculoId() == null ? null
+						: calculoRepository.findResumoById(operacao.getCalculoId()).map(CalculoResumo::nome).orElse(null));
 	}
 
 	private String nomeCliente(Long clienteId) {

@@ -1,5 +1,6 @@
 package com.cambia.banco;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
@@ -18,8 +19,8 @@ class BancoService {
 	}
 
 	Banco criar(BancoRequest request) {
-		Calculo calculo = buscarCalculo(request.calculoId());
-		Banco banco = new Banco(request.codigoBanco(), request.sigla(), request.nome(), request.taxaRebate(), calculo);
+		List<Calculo> calculos = buscarCalculos(request, List.of());
+		Banco banco = new Banco(request.codigoBanco(), request.sigla(), request.nome(), request.taxaRebate(), calculos);
 		return repository.save(banco);
 	}
 
@@ -33,9 +34,11 @@ class BancoService {
 	}
 
 	Banco atualizar(Long id, BancoRequest request) {
-		Calculo calculo = buscarCalculo(request.calculoId());
 		Banco banco = buscar(id);
-		banco.atualizar(request.codigoBanco(), request.sigla(), request.nome(), request.taxaRebate(), calculo);
+		List<Calculo> calculos = buscarCalculos(request, banco.getCalculos());
+		// Tirar um cálculo do banco não mexe nas ordens que já o usam (decisão do PO,
+		// Incremento 84): a ordem guarda o próprio cálculo.
+		banco.atualizar(request.codigoBanco(), request.sigla(), request.nome(), request.taxaRebate(), calculos);
 		return repository.save(banco);
 	}
 
@@ -47,9 +50,27 @@ class BancoService {
 		repository.flush();
 	}
 
-	private Calculo buscarCalculo(Long calculoId) {
-		return calculoRepository.findById(calculoId)
-				.orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cálculo não encontrado"));
+	/**
+	 * @param jaDoBanco cálculos que o banco já tem: um deles inativo pode continuar marcado
+	 *                  (Incremento 85); marcar um inativo novo, não.
+	 */
+	private List<Calculo> buscarCalculos(BancoRequest request, List<Calculo> jaDoBanco) {
+		List<Long> ids = request.calculosInformados();
+		if (ids.isEmpty()) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Informe ao menos um modelo de cálculo do banco");
+		}
+		List<Calculo> calculos = new ArrayList<>();
+		for (Long calculoId : ids) {
+			Calculo calculo = calculoRepository.findById(calculoId)
+					.orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cálculo não encontrado"));
+			boolean jaTinha = jaDoBanco.stream().anyMatch(c -> c.getId().equals(calculoId));
+			if (!calculo.isAtivo() && !jaTinha) {
+				throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+						"O modelo de cálculo \"" + calculo.getNome() + "\" está inativo");
+			}
+			calculos.add(calculo);
+		}
+		return calculos;
 	}
 
 }

@@ -4,6 +4,7 @@ import LoadingState from "../components/LoadingState";
 import SeletorPeriodo from "../components/SeletorPeriodo";
 import { formatarData } from "../utils/data";
 import { PRESETS_PERIODO } from "../utils/periodos";
+import BotoesExportacao from "../components/BotoesExportacao";
 
 function formatarMoeda(valor) {
 	if (valor === null || valor === undefined) return "—";
@@ -129,7 +130,15 @@ export default function RelatorioRankingsPage() {
 
 	return (
 		<div>
-			<h1>Rankings por Dimensão</h1>
+			<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+				<h1>Rankings por Dimensão</h1>
+				<BotoesExportacao
+					caminho="/relatorios/rankings"
+					query={modo === "DOIS_PERIODOS" ? `inicioA=${inicioA}&fimA=${fimA}&inicioB=${inicioB}&fimB=${fimB}` : `periodo=${periodo}`}
+					nomeArquivo="rankings"
+					desabilitado={doisPeriodosIndisponivel}
+				/>
+			</div>
 
 			<div className="relatorio-filtros">
 				<label>

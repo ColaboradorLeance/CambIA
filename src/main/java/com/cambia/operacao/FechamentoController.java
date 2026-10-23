@@ -3,6 +3,9 @@ package com.cambia.operacao;
 import java.time.LocalDate;
 import java.util.List;
 
+import com.cambia.exportacao.RelatorioExcelExporter;
+import com.cambia.exportacao.RelatorioPdfExporter;
+
 import jakarta.validation.Valid;
 
 import org.springframework.format.annotation.DateTimeFormat;
@@ -22,10 +25,13 @@ class FechamentoController {
 
 	private final FechamentoService service;
 	private final FechamentoConfiguracaoService configuracaoService;
+	private final RelatorioExportacaoService exportacaoService;
 
-	FechamentoController(FechamentoService service, FechamentoConfiguracaoService configuracaoService) {
+	FechamentoController(FechamentoService service, FechamentoConfiguracaoService configuracaoService,
+			RelatorioExportacaoService exportacaoService) {
 		this.service = service;
 		this.configuracaoService = configuracaoService;
+		this.exportacaoService = exportacaoService;
 	}
 
 	@GetMapping("/configuracao")
@@ -72,7 +78,7 @@ class FechamentoController {
 
 	@GetMapping("/{data}/pdf")
 	ResponseEntity<byte[]> exportarPdf(@PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate data) {
-		byte[] pdf = FechamentoPdfExporter.gerar(service.calcular(data));
+		byte[] pdf = RelatorioPdfExporter.gerar(exportacaoService.fechamento(service.calcular(data)));
 		return ResponseEntity.ok()
 				.contentType(MediaType.APPLICATION_PDF)
 				.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"fechamento-" + data + ".pdf\"")
@@ -81,7 +87,7 @@ class FechamentoController {
 
 	@GetMapping("/{data}/xlsx")
 	ResponseEntity<byte[]> exportarExcel(@PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate data) {
-		byte[] excel = FechamentoExcelExporter.gerar(service.calcular(data));
+		byte[] excel = RelatorioExcelExporter.gerar(exportacaoService.fechamento(service.calcular(data)));
 		return ResponseEntity.ok()
 				.contentType(MediaType.parseMediaType(
 						"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))

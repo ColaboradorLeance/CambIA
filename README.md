@@ -246,6 +246,10 @@ curl -X POST https://SEU_SERVIDOR/operacoes \
 
 A ordem é criada **Em andamento** (resposta `201` já com os valores calculados); para confirmá-la: `PATCH /operacoes/{id}/status` com `{"status":"CONFIRMADO"}`.
 
+A integração **não escolhe o modelo de cálculo** (um `calculoId` enviado é ignorado). Se o banco tiver um só modelo ativo, a ordem já entra com ele; se tiver mais de um, ela entra sem modelo (`calculoId: null`, Comissão Líquida vazia) e alguém escolhe na plataforma, em Operações → Editar, antes de confirmar — confirmar sem modelo responde `409`.
+
+Os relatórios também exportam em arquivo: acrescente `/pdf` ou `/xlsx` ao caminho (ex.: `GET /relatorios/operacoes/xlsx?periodo=MES`), com os mesmos parâmetros da versão JSON. Essas rotas exigem perfil Admin ou Analista.
+
 Para **consultar** ordens, prefira a listagem paginada: `GET /operacoes/pagina?status=CONFIRMADO&pagina=0&tamanho=50` (até 200 por página; aceita os mesmos filtros da tela, ex.: `&moeda=USD&nome=acme`) ou `GET /operacoes?status=ANDAMENTO`. `GET /operacoes` sem parâmetro traz o histórico inteiro e fica mais lento conforme ele cresce.
 
 | Resposta | Significado |
@@ -412,7 +416,8 @@ A mensagem é sempre genérica de propósito (a causa real nunca é exposta, por
 
 | Versão | Tag Docker | Data | Destaques |
 |---|---|---|---|
-| v1.0.0 | `:latest` `:1.0.0` | 2026-09-03 | Primeiro release — cadastros, operações de câmbio com cálculo automático, fechamento diário (PDF/Excel), relatórios, auditoria. |
+| v1.2.0 | `:latest` `:1.2.0` | 2026-10-23 | Chaves de API por usuário (escopos, expiração, rastreio de qual chave criou a ordem); exportação PDF/Excel de todos os relatórios com visual novo; banco com mais de um modelo de cálculo, modelo gravado na ordem e escolhido na plataforma para ordens vindas da API; ativar/desativar modelo de cálculo; busca de cálculos; modelo com a fórmula nas tabelas de ordens; listagem de ordens paginada; versão do sistema em todas as telas. **Migrações automáticas V27–V30** (sem passo manual). |
+| v1.0.0 | `:1.0.0` | 2026-09-03 | Primeiro release — cadastros, operações de câmbio com cálculo automático, fechamento diário (PDF/Excel), relatórios, auditoria. |
 
 ---
 

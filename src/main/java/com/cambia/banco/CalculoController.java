@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -50,6 +51,11 @@ class CalculoController {
 	@PutMapping("/{id}")
 	CalculoResponse atualizar(@PathVariable Long id, @Valid @RequestBody CalculoRequest request) {
 		return CalculoResponse.from(service.atualizar(id, request));
+	}
+
+	@PatchMapping("/{id}/ativo")
+	CalculoResponse definirAtivo(@PathVariable Long id, @Valid @RequestBody AtivoRequest request) {
+		return CalculoResponse.from(service.definirAtivo(id, request.ativo()));
 	}
 
 	@DeleteMapping("/{id}")

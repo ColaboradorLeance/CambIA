@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
+import com.cambia.chaveapi.ChaveApiService;
 import com.cambia.usuario.Usuario;
 import com.cambia.usuario.UsuarioRepository;
 
@@ -19,19 +20,27 @@ class OperacaoEventoService {
 	private final OperacaoRepository operacaoRepository;
 	private final UsuarioRepository usuarioRepository;
 	private final ObjectMapper objectMapper;
+	private final ChaveApiService chaveApiService;
 
 	OperacaoEventoService(OperacaoEventoRepository repository, OperacaoRepository operacaoRepository,
-			UsuarioRepository usuarioRepository, ObjectMapper objectMapper) {
+			UsuarioRepository usuarioRepository, ObjectMapper objectMapper, ChaveApiService chaveApiService) {
 		this.repository = repository;
 		this.operacaoRepository = operacaoRepository;
 		this.usuarioRepository = usuarioRepository;
 		this.objectMapper = objectMapper;
+		this.chaveApiService = chaveApiService;
 	}
 
 	void registrar(TipoEventoOperacao tipo, Long operacaoId, Long usuarioId, Instant agora,
 			OperacaoSnapshot dadosAnteriores) {
+		registrar(tipo, operacaoId, usuarioId, agora, dadosAnteriores, null);
+	}
+
+	/** @param chaveApiId chave de API que agiu (Incremento 81, K9); null = ação feita pela tela. */
+	void registrar(TipoEventoOperacao tipo, Long operacaoId, Long usuarioId, Instant agora,
+			OperacaoSnapshot dadosAnteriores, Long chaveApiId) {
 		String json = dadosAnteriores == null ? null : escrever(dadosAnteriores);
-		repository.save(new OperacaoEvento(operacaoId, tipo, usuarioId, agora, json));
+		repository.save(new OperacaoEvento(operacaoId, tipo, usuarioId, agora, json, chaveApiId));
 	}
 
 	private String escrever(OperacaoSnapshot snapshot) {
@@ -58,6 +67,9 @@ class OperacaoEventoService {
 
 		Map<Long, String> idTradePorOperacao = operacaoRepository.findAll().stream()
 				.collect(java.util.stream.Collectors.toMap(Operacao::getId, Operacao::getIdTrade));
+		// Uma consulta só para os nomes das chaves que aparecem no histórico.
+		Map<Long, String> nomesDasChaves = chaveApiService.nomesPorId(eventos.stream()
+				.map(OperacaoEvento::getChaveApiId).filter(java.util.Objects::nonNull).distinct().toList());
 
 		return eventos.stream()
 				.map(evento -> new OperacaoEventoResponse(
@@ -68,7 +80,8 @@ class OperacaoEventoService {
 						usuarioRepository.findById(evento.getUsuarioId()).map(Usuario::getNome)
 								.orElse("Usuário #" + evento.getUsuarioId()),
 						evento.getCriadoEm(),
-						ler(evento.getDadosAnteriores())))
+						ler(evento.getDadosAnteriores()),
+						evento.getChaveApiId() == null ? null : nomesDasChaves.get(evento.getChaveApiId())))
 				.toList();
 	}
 

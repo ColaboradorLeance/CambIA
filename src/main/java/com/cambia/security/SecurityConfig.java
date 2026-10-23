@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.authorization.AuthenticatedAuthorizationManager;
 import org.springframework.security.authorization.AuthorityAuthorizationManager;
 import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.authorization.AuthorizationManager;
@@ -62,6 +63,9 @@ class SecurityConfig {
 						.requestMatchers("/auth/**").access(semChaveDeApi(PERMITIR_TODOS))
 						.requestMatchers("/usuarios/**", "/chaves-api/**")
 								.access(semChaveDeApi(AuthorityAuthorizationManager.hasRole("ADMIN")))
+						// Incremento 81 (K1): cada usuário gerencia as próprias chaves no perfil —
+						// qualquer perfil com sessão, nunca com chave (D7 ampliada).
+						.requestMatchers("/perfil/**").access(semChaveDeApi(AuthenticatedAuthorizationManager.authenticated()))
 						.requestMatchers("/actuator/health", "/error").permitAll()
 						// Operações: Consultor só consulta; Admin e Analista criam, editam e completam
 						.requestMatchers(HttpMethod.GET, "/operacoes/**").authenticated()

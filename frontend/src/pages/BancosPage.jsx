@@ -3,7 +3,7 @@ import { api } from "../api/client";
 import LoadingState from "../components/LoadingState";
 import EmptyState from "../components/EmptyState";
 
-const FORM_VAZIO = { codigoBanco: "", sigla: "", nome: "", taxaRebate: "", calculoId: "" };
+const FORM_VAZIO = { codigoBanco: "", sigla: "", nome: "", taxaRebate: "", calculoIds: [] };
 
 // Preenchimento automático do Nome a partir do código COMPE (3 dígitos) ou ISPB
 // (8 dígitos) digitado em "Código do banco". Qualquer outro tamanho não dispara
@@ -68,7 +68,7 @@ export default function BancosPage() {
 				sigla: form.sigla,
 				nome: form.nome,
 				taxaRebate: Number(form.taxaRebate),
-				calculoId: Number(form.calculoId),
+				calculoIds: form.calculoIds,
 			};
 			if (editandoId) {
 				await api.put(`/bancos/${editandoId}`, payload);
@@ -89,8 +89,20 @@ export default function BancosPage() {
 			sigla: banco.sigla,
 			nome: banco.nome,
 			taxaRebate: String(banco.taxaRebate),
-			calculoId: String(banco.calculoId),
+			calculoIds: banco.calculos.map((c) => c.id),
 		});
+	}
+
+	// Incremento 85: inativo só aparece no banco que já o tinha (o backend recusa marcar um novo).
+	const bancoEmEdicao = bancos.find((b) => b.id === editandoId);
+
+	function alternarCalculo(id) {
+		setForm((atual) => ({
+			...atual,
+			calculoIds: atual.calculoIds.includes(id)
+				? atual.calculoIds.filter((c) => c !== id)
+				: [...atual.calculoIds, id],
+		}));
 	}
 
 	function cancelarEdicao() {
@@ -202,23 +214,32 @@ export default function BancosPage() {
 					onChange={(e) => setForm({ ...form, taxaRebate: e.target.value })}
 					required
 				/>
-				<select
-					value={form.calculoId}
-					onChange={(e) => setForm({ ...form, calculoId: e.target.value })}
-					required
-				>
-					<option value="" disabled>
-						Selecione o cálculo
-					</option>
-					{calculos.map((c) => (
-						<option key={c.id} value={c.id}>
-							{c.nome}
-						</option>
-					))}
-				</select>
+				{/* Incremento 84: o banco pode ter mais de um modelo de cálculo; com mais de
+				    um, a ordem escolhe qual usar. */}
+				<fieldset className="banco-calculos">
+					<legend>Modelos de cálculo do banco</legend>
+					{calculos
+						.filter((c) => c.ativo || bancoEmEdicao?.calculos.some((x) => x.id === c.id))
+						.map((c) => (
+							<label key={c.id}>
+								<input
+									type="checkbox"
+									checked={form.calculoIds.includes(c.id)}
+									onChange={() => alternarCalculo(c.id)}
+								/>
+								{c.nome} <code>{c.formula}</code>
+								{!c.ativo && <span className="badge badge-neutral">Inativo</span>}
+							</label>
+						))}
+				</fieldset>
 
 				<div>
-					<button type="submit" className="btn btn-primary" disabled={calculos.length === 0}>
+					<button
+						type="submit"
+						className="btn btn-primary"
+						disabled={calculos.length === 0 || form.calculoIds.length === 0}
+						title={form.calculoIds.length === 0 ? "Marque ao menos um modelo de cálculo" : undefined}
+					>
 						{editandoId ? "Atualizar" : "Adicionar"}
 					</button>{" "}
 					{editandoId && (
@@ -245,7 +266,7 @@ export default function BancosPage() {
 								<th>Sigla</th>
 								<th>Nome</th>
 								<th>Taxa de rebate</th>
-								<th>Cálculo</th>
+								<th>Cálculos</th>
 								<th></th>
 							</tr>
 						</thead>
@@ -257,7 +278,12 @@ export default function BancosPage() {
 									<td>{banco.nome}</td>
 									<td className="mono">{banco.taxaRebate}%</td>
 									<td>
-										{banco.calculoNome} <code>{banco.calculoFormula}</code>
+										{banco.calculos.map((c) => (
+											<div key={c.id}>
+												{c.nome} <code>{c.formula}</code>
+												{!c.ativo && <span className="badge badge-neutral">Inativo</span>}
+											</div>
+										))}
 									</td>
 									<td>
 										<button className="btn btn-secondary btn-sm" onClick={() => editar(banco)}>

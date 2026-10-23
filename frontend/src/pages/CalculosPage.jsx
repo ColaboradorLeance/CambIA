@@ -6,11 +6,18 @@ import EmptyState from "../components/EmptyState";
 
 const FORM_VAZIO = { nome: "", formula: "" };
 
+// Busca por nome sem diferenciar maiúsculas nem acentos ("calculo" acha "Cálculo").
+function normalizar(texto) {
+	return (texto || "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+}
+
 export default function CalculosPage() {
 	const [calculos, setCalculos] = useState([]);
 	const [form, setForm] = useState(FORM_VAZIO);
 	const [editandoId, setEditandoId] = useState(null);
 	const [carregando, setCarregando] = useState(true);
+	const [busca, setBusca] = useState("");
+	const calculosVisiveis = calculos.filter((c) => normalizar(c.nome).includes(normalizar(busca.trim())));
 
 	async function carregar() {
 		setCarregando(true);
@@ -51,6 +58,17 @@ export default function CalculosPage() {
 	function cancelarEdicao() {
 		setEditandoId(null);
 		setForm(FORM_VAZIO);
+	}
+
+	// Incremento 85: inativo continua nos bancos e nas ordens que já o usam, mas não pode
+	// ser escolhido em ordens novas.
+	async function alternarAtivo(calculo) {
+		try {
+			await api.patch(`/calculos/${calculo.id}/ativo`, { ativo: !calculo.ativo });
+			carregar();
+		} catch {
+			// erro já mostrado como pop-up pelo api/client.js
+		}
 	}
 
 	async function remover(id) {
@@ -104,25 +122,57 @@ export default function CalculosPage() {
 					message="Cadastre o primeiro modelo usando o formulário acima."
 				/>
 			) : (
+				<>
+				<input
+					type="search"
+					className="busca-cadastro"
+					placeholder="Buscar cálculo por nome"
+					value={busca}
+					onChange={(e) => setBusca(e.target.value)}
+				/>
 				<div className="table-card">
 					<table>
 						<thead>
 							<tr>
 								<th>Nome</th>
 								<th>Fórmula</th>
+								<th>Situação</th>
 								<th></th>
 							</tr>
 						</thead>
 						<tbody>
-							{calculos.map((calculo) => (
+							{calculosVisiveis.length === 0 && (
+								<tr>
+									<td colSpan={4} className="busca-cadastro-vazio">
+										Nenhum cálculo com “{busca.trim()}” no nome.
+									</td>
+								</tr>
+							)}
+							{calculosVisiveis.map((calculo) => (
 								<tr key={calculo.id}>
 									<td>{calculo.nome}</td>
 									<td>
 										<code>{calculo.formula}</code>
 									</td>
 									<td>
+										<span className={`badge ${calculo.ativo ? "badge-success" : "badge-neutral"}`}>
+											{calculo.ativo ? "Ativo" : "Inativo"}
+										</span>
+									</td>
+									<td>
 										<button className="btn btn-secondary btn-sm" onClick={() => editar(calculo)}>
 											Editar
+										</button>{" "}
+										<button
+											className="btn btn-secondary btn-sm"
+											onClick={() => alternarAtivo(calculo)}
+											title={
+												calculo.ativo
+													? "Ordens novas deixam de poder usar este cálculo"
+													: "Volta a poder ser usado em ordens novas"
+											}
+										>
+											{calculo.ativo ? "Desativar" : "Ativar"}
 										</button>{" "}
 										<button className="btn btn-danger btn-sm" onClick={() => remover(calculo.id)}>
 											Remover
@@ -133,6 +183,7 @@ export default function CalculosPage() {
 						</tbody>
 					</table>
 				</div>
+				</>
 			)}
 		</div>
 	);

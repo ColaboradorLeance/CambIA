@@ -6,6 +6,7 @@ import EmptyState from "../components/EmptyState";
 import ConfirmModal from "../components/ConfirmModal";
 import CurrencyPicker from "../components/CurrencyPicker";
 import SearchPicker from "../components/SearchPicker";
+import ModeloCalculo from "../components/ModeloCalculo";
 import { formatarData, formatarDataHora } from "../utils/data";
 import { formatarMoeda, formatarPercentual, formatarSpreadEmissao, calcularFundo } from "../utils/formatacao";
 
@@ -17,6 +18,9 @@ const FORM_VAZIO = {
 	data: "",
 	clienteId: "",
 	bancoId: "",
+	// Incremento 84: só aparece (e é obrigatório) quando o banco tem mais de um modelo de
+	// cálculo; com um só, o backend usa ele sozinho.
+	calculoId: "",
 	// Código da operação (Incremento 71): só números; opcional aqui porque a tela só cria
 	// ordens "Pronto" — a obrigatoriedade (tipo Crédito) é validada pelo backend (400).
 	codigoOperacao: "",
@@ -60,6 +64,9 @@ export default function OperacoesPage() {
 	const [form, setForm] = useState(FORM_VAZIO);
 	const [filtros, setFiltros] = useState(FILTROS_VAZIOS);
 	const [editandoId, setEditandoId] = useState(null);
+	// Cálculo que a ordem em edição já usa: pode ter saído do banco e continua valendo
+	// (decisão do PO, Incremento 84), então entra como opção mesmo assim.
+	const [calculoDaOrdem, setCalculoDaOrdem] = useState(null);
 	const [carregando, setCarregando] = useState(true);
 	const [operacaoParaConfirmar, setOperacaoParaConfirmar] = useState(null);
 	const [operacaoParaCancelar, setOperacaoParaCancelar] = useState(null);
@@ -95,6 +102,29 @@ export default function OperacoesPage() {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
+	// Incremento 84: modelos de cálculo que a ordem pode usar com o banco escolhido.
+	const bancoEscolhido = bancos.find((b) => String(b.id) === String(form.bancoId));
+	// Incremento 85: só os ativos; o que a ordem em edição já usa entra mesmo inativo ou
+	// fora do banco — ela continua com ele (decisões do PO).
+	const opcoesCalculo = bancoEscolhido ? bancoEscolhido.calculos.filter((c) => c.ativo) : [];
+	if (
+		calculoDaOrdem &&
+		String(calculoDaOrdem.bancoId) === String(form.bancoId) &&
+		!opcoesCalculo.some((c) => c.id === calculoDaOrdem.id)
+	) {
+		const noBanco = bancoEscolhido?.calculos.some((c) => c.id === calculoDaOrdem.id);
+		opcoesCalculo.push({
+			id: calculoDaOrdem.id,
+			nome: `${calculoDaOrdem.nome} (${noBanco ? "inativo" : "não é mais do banco"})`,
+		});
+	}
+
+	// Item 2 do pedido: com um só modelo ativo a caixinha já vem preenchida.
+	function calculoUnico(bancoId) {
+		const ativos = (bancos.find((b) => String(b.id) === String(bancoId))?.calculos || []).filter((c) => c.ativo);
+		return ativos.length === 1 ? String(ativos[0].id) : "";
+	}
+
 	async function salvar(evento) {
 		evento.preventDefault();
 		try {
@@ -103,6 +133,7 @@ export default function OperacoesPage() {
 				codigoOperacao: form.codigoOperacao || null,
 				clienteId: Number(form.clienteId),
 				bancoId: Number(form.bancoId),
+				calculoId: form.calculoId ? Number(form.calculoId) : null,
 				valorMe: Number(form.valorMe),
 				spotAsset: form.spotAsset === "" || form.spotAsset == null ? null : Number(form.spotAsset),
 				nivelamento: Number(form.nivelamento),
@@ -122,10 +153,14 @@ export default function OperacoesPage() {
 
 	function editar(op) {
 		setEditandoId(op.id);
+		setCalculoDaOrdem(
+			op.calculoId ? { bancoId: op.bancoId, id: op.calculoId, nome: op.calculoNome } : null,
+		);
 		setForm({
 			data: op.data,
 			clienteId: String(op.clienteId),
 			bancoId: String(op.bancoId),
+			calculoId: op.calculoId ? String(op.calculoId) : calculoUnico(op.bancoId),
 			codigoOperacao: op.codigoOperacao || "",
 			cv: op.cv,
 			prCrVir: op.prCrVir,
@@ -149,6 +184,7 @@ export default function OperacoesPage() {
 	function cancelarEdicao() {
 		setEditandoId(null);
 		setForm(FORM_VAZIO);
+		setCalculoDaOrdem(null);
 	}
 
 	async function mudarStatus(id, status) {
@@ -241,6 +277,11 @@ export default function OperacoesPage() {
 	// — o que o usuário vê marcado é exatamente o que o botão confirma.
 	const idsSelecionadosVisiveis = filtradas.filter((op) => selecionadas.has(op.id)).map((op) => op.id);
 	const todasVisiveisSelecionadas = filtradas.length > 0 && idsSelecionadosVisiveis.length === filtradas.length;
+	// Incremento 86: ordem sem modelo de cálculo (veio pela API) não confirma — fica de fora do lote.
+	const idsConfirmaveis = filtradas
+		.filter((op) => selecionadas.has(op.id) && op.calculoId)
+		.map((op) => op.id);
+	const selecionadasSemModelo = idsSelecionadosVisiveis.length - idsConfirmaveis.length;
 
 	return (
 		<div>
@@ -277,11 +318,30 @@ export default function OperacoesPage() {
 					<SearchPicker
 						items={bancos.map((b) => ({ id: b.id, label: b.nome }))}
 						value={form.bancoId}
-						onChange={(id) => setForm({ ...form, bancoId: String(id) })}
+						onChange={(id) => setForm({ ...form, bancoId: String(id), calculoId: calculoUnico(id) })}
 						placeholder="Buscar banco"
 						required
 					/>
 				</label>
+				{bancoEscolhido && (
+					<label>
+						Modelo de cálculo
+						<select
+							value={form.calculoId}
+							onChange={(e) => setForm({ ...form, calculoId: e.target.value })}
+							required
+						>
+							<option value="" disabled>
+								{opcoesCalculo.length === 0 ? "Banco sem modelo ativo" : "Selecione"}
+							</option>
+							{opcoesCalculo.map((c) => (
+								<option key={c.id} value={c.id}>
+									{c.nome}
+								</option>
+							))}
+						</select>
+					</label>
+				)}
 				<label>
 					Código Operação Origem
 					<input
@@ -488,10 +548,15 @@ export default function OperacoesPage() {
 					<button
 						type="button"
 						className="btn btn-primary"
-						disabled={idsSelecionadosVisiveis.length === 0}
+						disabled={idsConfirmaveis.length === 0}
+						title={
+							selecionadasSemModelo > 0
+								? `${selecionadasSemModelo} selecionada(s) sem modelo de cálculo ficam de fora`
+								: undefined
+						}
 						onClick={() => setConfirmandoSelecionadas(true)}
 					>
-						Confirmar selecionadas ({idsSelecionadosVisiveis.length})
+						Confirmar selecionadas ({idsConfirmaveis.length})
 					</button>
 				</div>
 			)}
@@ -515,6 +580,7 @@ export default function OperacoesPage() {
 						<th>Cliente</th>
 						<th>CNPJ/CPF</th>
 						<th>Banco</th>
+						<th>Modelo de cálculo</th>
 						<th>C/V</th>
 						<th>Tipo Ordem</th>
 						<th>Valor em moeda</th>
@@ -556,6 +622,11 @@ export default function OperacoesPage() {
 							<td>{op.clienteNome || `#${op.clienteId}`}</td>
 							<td>{op.clienteDocumento || "—"}</td>
 							<td>{op.bancoNome || `#${op.bancoId}`}</td>
+							{/* Incremento 86: sem modelo (ordem da API em banco com vários) mostra
+							    "Escolher modelo" — escolher em "Editar" antes de confirmar. */}
+							<td>
+								<ModeloCalculo nome={op.calculoNome} formula={op.calculoFormula} />
+							</td>
 							<td>{op.cv}</td>
 							<td>{op.prCrVir}</td>
 							<td className="mono">{formatarMoeda(op.valorMe)}</td>
@@ -593,6 +664,8 @@ export default function OperacoesPage() {
 										<button
 											className="btn btn-secondary btn-sm"
 											onClick={() => setOperacaoParaConfirmar(op)}
+											disabled={!op.calculoId}
+											title={!op.calculoId ? "Escolha o modelo de cálculo em Editar antes de confirmar" : undefined}
 										>
 											Confirmar
 										</button>{" "}
@@ -618,12 +691,12 @@ export default function OperacoesPage() {
 			title="Confirmar ordens selecionadas"
 			message={
 				<>
-					Confirma as <strong>{idsSelecionadosVisiveis.length}</strong> ordens selecionadas? Os valores
+					Confirma as <strong>{idsConfirmaveis.length}</strong> ordens selecionadas? Os valores
 					calculados de cada uma ficam travados como estão e nenhuma delas pode voltar para "Em andamento".
 				</>
 			}
 			confirmLabel="Confirmar todas"
-			onConfirm={() => confirmarSelecionadas(idsSelecionadosVisiveis)}
+			onConfirm={() => confirmarSelecionadas(idsConfirmaveis)}
 			onCancel={() => setConfirmandoSelecionadas(false)}
 		/>
 

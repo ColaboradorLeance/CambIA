@@ -15,6 +15,9 @@ record OperacaoResponse(
 		String clienteDocumento,
 		Long bancoId,
 		String bancoNome,
+		Long calculoId,
+		String calculoNome,
+		String calculoFormula,
 		String cv,
 		String prCrVir,
 		String fundo,
@@ -47,13 +50,14 @@ record OperacaoResponse(
 	 */
 	OperacaoResponse semValoresCalculados() {
 		return new OperacaoResponse(id, idTrade, data, codigoBanco, codigoOperacao, clienteId, clienteNome,
-				clienteDocumento, bancoId, bancoNome, cv, prCrVir, fundo, spreadEmissao, moeda, valorMe, spotAsset,
-				nivelamento, taxaFinal, null, null, null, null, null, null, null, null, status, criadoPorNome,
-				criadoEm, completadoPorNome, completadoEm);
+				clienteDocumento, bancoId, bancoNome, calculoId, calculoNome, calculoFormula, cv, prCrVir, fundo,
+				spreadEmissao, moeda, valorMe, spotAsset, nivelamento, taxaFinal, null, null, null, null, null, null,
+				null, null, status, criadoPorNome, criadoEm, completadoPorNome, completadoEm);
 	}
 
 	static OperacaoResponse from(Operacao operacao, ValoresCalculados valores, String criadoPorNome,
-			String completadoPorNome, String clienteNome, String clienteDocumento, String bancoNome) {
+			String completadoPorNome, String clienteNome, String clienteDocumento, String bancoNome,
+			String calculoNome, String calculoFormula) {
 		return new OperacaoResponse(
 				operacao.getId(),
 				operacao.getIdTrade(),
@@ -65,6 +69,9 @@ record OperacaoResponse(
 				clienteDocumento,
 				operacao.getBancoId(),
 				bancoNome,
+				operacao.getCalculoId(),
+				calculoNome,
+				calculoFormula,
 				operacao.getCv(),
 				operacao.getPrCrVir(),
 				operacao.getFundo(),

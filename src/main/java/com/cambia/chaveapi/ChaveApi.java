@@ -3,6 +3,7 @@ package com.cambia.chaveapi;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Set;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -41,6 +42,9 @@ class ChaveApi {
 	@Column(name = "expira_em")
 	private LocalDate expiraEm;
 
+	// Gravado como "LEITURA,CRIAR_ORDENS" (Incremento 81, K4); lido pelo EscopoChaveApi.
+	private String escopos;
+
 	@Column(name = "ultimo_uso_em")
 	private Instant ultimoUsoEm;
 
@@ -53,29 +57,40 @@ class ChaveApi {
 	protected ChaveApi() {
 	}
 
-	ChaveApi(String nome, Long usuarioId, String prefixo, String hash, Instant criadaEm, Long criadaPorUsuarioId,
-			LocalDate expiraEm) {
+	// Incremento 81: o dono (usuarioId) é quem cria (K2), então criada_por = usuario_id nas
+	// chaves novas; as duas colunas continuam separadas porque as chaves do Inc. 79 foram
+	// criadas pelo Admin para um usuário técnico.
+	ChaveApi(String nome, Long donoId, String prefixo, String hash, Instant criadaEm, LocalDate expiraEm,
+			Set<EscopoChaveApi> escopos) {
 		this.nome = nome;
-		this.usuarioId = usuarioId;
+		this.usuarioId = donoId;
 		this.prefixo = prefixo;
 		this.hash = hash;
 		this.criadaEm = criadaEm;
-		this.criadaPorUsuarioId = criadaPorUsuarioId;
+		this.criadaPorUsuarioId = donoId;
 		this.expiraEm = expiraEm;
+		this.escopos = EscopoChaveApi.gravar(escopos);
 	}
 
 	/** Válida até o fim do dia de expiração (inclusive); revogada nunca volta a valer (D5). */
 	boolean isAtiva(LocalDate hoje) {
-		return revogadaEm == null && (expiraEm == null || !hoje.isAfter(expiraEm));
+		return revogadaEm == null && !hoje.isAfter(expiraEm);
+	}
+
+	/** Situação mostrada nas telas: a revogação vence a expiração (é a informação mais útil). */
+	StatusChaveApi status(LocalDate hoje) {
+		if (revogadaEm != null) {
+			return StatusChaveApi.REVOGADA;
+		}
+		return hoje.isAfter(expiraEm) ? StatusChaveApi.EXPIRADA : StatusChaveApi.ATIVA;
+	}
+
+	Set<EscopoChaveApi> getEscopos() {
+		return EscopoChaveApi.ler(escopos);
 	}
 
 	boolean isRevogada() {
 		return revogadaEm != null;
-	}
-
-	void revogar(Long usuarioId, Instant agora) {
-		this.revogadaEm = agora;
-		this.revogadaPorUsuarioId = usuarioId;
 	}
 
 	/** @return {@code true} se o último uso mudou e a entidade precisa ser salva. */

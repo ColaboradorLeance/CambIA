@@ -12,5 +12,7 @@ record OperacaoEventoResponse(
 		TipoEventoOperacao tipo,
 		String usuarioNome,
 		Instant criadoEm,
-		OperacaoSnapshot dadosAnteriores) {
+		OperacaoSnapshot dadosAnteriores,
+		// Incremento 81 (K9): nome da chave de API que agiu; ausente quando foi pela tela.
+		String chaveApiNome) {
 }

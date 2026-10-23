@@ -8,6 +8,7 @@ import BancosPage from "./pages/BancosPage";
 import CalculosPage from "./pages/CalculosPage";
 import UsuariosPage from "./pages/UsuariosPage";
 import ChavesApiPage from "./pages/ChavesApiPage";
+import PerfilPage from "./pages/PerfilPage";
 import OperacoesPage from "./pages/OperacoesPage";
 import ListagemOrdensPage from "./pages/ListagemOrdensPage";
 import FechamentoPage from "./pages/FechamentoPage";
@@ -155,10 +156,11 @@ function Layout({ children }) {
 
 				<div className="app-sidebar-footer">
 					<div className="app-user-avatar">{inicial}</div>
-					<div className="app-user-info">
+					{/* Incremento 81: o nome abre "Meu perfil" (chaves de API do próprio usuário), em qualquer perfil. */}
+					<Link to="/perfil" className="app-user-info" title="Meu perfil">
 						<div className="app-user-name">{usuario?.nome}</div>
 						<div className="app-user-role">{ROTULOS_PERFIL[usuario?.perfil] || usuario?.perfil}</div>
-					</div>
+					</Link>
 					<button onClick={logout} aria-label="Sair" title="Sair">
 						<IconLogout size={16} />
 					</button>
@@ -305,6 +307,14 @@ export default function App() {
 					<Pagina roles={["ADMIN"]}>
 						<SubNav itens={ABAS_CADASTROS} />
 						<UsuariosPage />
+					</Pagina>
+				}
+			/>
+			<Route
+				path="/perfil"
+				element={
+					<Pagina>
+						<PerfilPage />
 					</Pagina>
 				}
 			/>

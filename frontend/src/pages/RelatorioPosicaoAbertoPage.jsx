@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import LoadingState from "../components/LoadingState";
 import { formatarData } from "../utils/data";
+import BotoesExportacao from "../components/BotoesExportacao";
 
 function formatarMoeda(valor) {
 	if (valor === null || valor === undefined) return "—";
@@ -64,7 +65,10 @@ export default function RelatorioPosicaoAbertoPage() {
 
 	return (
 		<div>
-			<h1>Posição em Aberto</h1>
+			<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+				<h1>Posição em Aberto</h1>
+				<BotoesExportacao caminho="/relatorios/posicao-aberto" nomeArquivo="posicao-em-aberto" />
+			</div>
 
 			{carregando && <LoadingState label="Carregando posição em aberto…" />}
 

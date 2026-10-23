@@ -19,9 +19,12 @@ record OperacaoSnapshot(
 		BigDecimal valorMe,
 		BigDecimal spotAsset,
 		BigDecimal nivelamento,
-		BigDecimal taxaFinal) {
+		BigDecimal taxaFinal,
+		// Incremento 84 — null nos eventos gravados antes dele.
+		Long calculoId,
+		String calculoNome) {
 
-	static OperacaoSnapshot de(Operacao operacao, String clienteNome, String bancoNome) {
+	static OperacaoSnapshot de(Operacao operacao, String clienteNome, String bancoNome, String calculoNome) {
 		return new OperacaoSnapshot(
 				operacao.getData(),
 				operacao.getCodigoBanco(),
@@ -38,7 +41,9 @@ record OperacaoSnapshot(
 				operacao.getValorMe(),
 				operacao.getSpotAsset(),
 				operacao.getNivelamento(),
-				operacao.getTaxaFinal());
+				operacao.getTaxaFinal(),
+				operacao.getCalculoId(),
+				calculoNome);
 	}
 
 }

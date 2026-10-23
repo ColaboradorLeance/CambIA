@@ -18,6 +18,10 @@ class Calculo {
 
 	private String formula;
 
+	// Incremento 85: inativo continua valendo onde já está (bancos e ordens), mas ordens
+	// novas não podem escolhê-lo.
+	private boolean ativo = true;
+
 	protected Calculo() {
 	}
 
@@ -36,6 +40,14 @@ class Calculo {
 
 	String getFormula() {
 		return formula;
+	}
+
+	boolean isAtivo() {
+		return ativo;
+	}
+
+	void definirAtivo(boolean ativo) {
+		this.ativo = ativo;
 	}
 
 	void atualizar(String nome, String formula) {

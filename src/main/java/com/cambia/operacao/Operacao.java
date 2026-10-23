@@ -41,6 +41,12 @@ class Operacao {
 	@Column(name = "banco_id")
 	private Long bancoId;
 
+	// Incremento 84: o modelo de cálculo (entre os do banco) que a Comissão Líquida usa.
+	// Fica na ordem — tirar o cálculo do banco depois não muda as ordens que já o usam.
+	// Null (Incremento 86): ordem da API aguardando a escolha na plataforma — não confirma.
+	@Column(name = "modelo_calculo_id")
+	private Long calculoId;
+
 	private String cv;
 
 	@Column(name = "pr_cr_vir")
@@ -89,15 +95,16 @@ class Operacao {
 	}
 
 	Operacao(String idTrade, LocalDate data, String codigoBanco, String codigoOperacao, Long clienteId, Long bancoId,
-			String cv, String prCrVir, String fundo, String spreadEmissao, String moeda, BigDecimal valorMe,
-			BigDecimal spotAsset, BigDecimal nivelamento, BigDecimal taxaFinal, Long criadoPorUsuarioId,
-			Instant criadoEm) {
+			Long calculoId, String cv, String prCrVir, String fundo, String spreadEmissao, String moeda,
+			BigDecimal valorMe, BigDecimal spotAsset, BigDecimal nivelamento, BigDecimal taxaFinal,
+			Long criadoPorUsuarioId, Instant criadoEm) {
 		this.idTrade = idTrade;
 		this.data = data;
 		this.codigoBanco = codigoBanco;
 		this.codigoOperacao = codigoOperacao;
 		this.clienteId = clienteId;
 		this.bancoId = bancoId;
+		this.calculoId = calculoId;
 		this.cv = cv;
 		this.prCrVir = prCrVir;
 		this.fundo = fundo;
@@ -138,6 +145,10 @@ class Operacao {
 
 	Long getBancoId() {
 		return bancoId;
+	}
+
+	Long getCalculoId() {
+		return calculoId;
 	}
 
 	String getCv() {
@@ -196,14 +207,15 @@ class Operacao {
 		return completadoEm;
 	}
 
-	void editar(String codigoBanco, String codigoOperacao, Long clienteId, Long bancoId, String cv, String prCrVir,
-			String fundo, String spreadEmissao, String moeda, BigDecimal valorMe, BigDecimal spotAsset,
+	void editar(String codigoBanco, String codigoOperacao, Long clienteId, Long bancoId, Long calculoId, String cv,
+			String prCrVir, String fundo, String spreadEmissao, String moeda, BigDecimal valorMe, BigDecimal spotAsset,
 			BigDecimal nivelamento, BigDecimal taxaFinal) {
 		// Data não entra aqui de propósito: não pode ser editada depois de criada (pedido do usuário).
 		this.codigoBanco = codigoBanco;
 		this.codigoOperacao = codigoOperacao;
 		this.clienteId = clienteId;
 		this.bancoId = bancoId;
+		this.calculoId = calculoId;
 		this.cv = cv;
 		this.prCrVir = prCrVir;
 		this.fundo = fundo;

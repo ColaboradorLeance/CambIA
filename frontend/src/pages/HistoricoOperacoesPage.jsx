@@ -77,7 +77,16 @@ export default function HistoricoOperacoesPage() {
 										<td>
 											<span className={`badge ${rotulo.classe}`}>{rotulo.texto}</span>
 										</td>
-										<td>{evento.usuarioNome}</td>
+										{/* Incremento 81 (K9): ação feita por chave de API mostra qual chave. */}
+										<td>
+											{evento.usuarioNome}
+											{evento.chaveApiNome && (
+												<span className="mono" title="Feito por chave de API">
+													{" "}
+													(chave: {evento.chaveApiNome})
+												</span>
+											)}
+										</td>
 										<td>
 											{evento.tipo === "EDITADA" ? (
 												<>Valores antes da edição: {descreverSnapshot(evento.dadosAnteriores)}</>

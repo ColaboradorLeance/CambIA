@@ -23,6 +23,20 @@ public class TestAuthSupport {
 
 	public static String obterToken(MockMvc mockMvc, UsuarioRepository usuarioRepository,
 			MagicLinkTokenRepository magicLinkTokenRepository, Perfil perfil, String nome) throws Exception {
+		return obterSessao(mockMvc, usuarioRepository, magicLinkTokenRepository, perfil, nome).token();
+	}
+
+	/** Sessão de teste com o usuário dela — o Incremento 81 precisa saber quem é o dono da chave. */
+	public record Sessao(String token, Usuario usuario) {
+
+		public String bearer() {
+			return "Bearer " + token;
+		}
+
+	}
+
+	public static Sessao obterSessao(MockMvc mockMvc, UsuarioRepository usuarioRepository,
+			MagicLinkTokenRepository magicLinkTokenRepository, Perfil perfil, String nome) throws Exception {
 		String email = "teste-" + UUID.randomUUID() + "@cambia.com.br";
 		Usuario usuario = usuarioRepository.save(UsuarioTestFactory.novo(nome, email, perfil));
 
@@ -37,7 +51,7 @@ public class TestAuthSupport {
 				.andExpect(status().isOk())
 				.andReturn().getResponse().getContentAsString();
 
-		return JsonPath.read(responseBody, "$.sessionToken");
+		return new Sessao(JsonPath.read(responseBody, "$.sessionToken"), usuario);
 	}
 
 }

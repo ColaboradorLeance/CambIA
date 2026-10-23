@@ -78,8 +78,9 @@ class BancoControllerTests {
 				.andExpect(jsonPath("$.sigla").value("BZA"))
 				.andExpect(jsonPath("$.nome").value("Banco BZA"))
 				.andExpect(jsonPath("$.taxaRebate").value(1.5))
-				.andExpect(jsonPath("$.calculoId").value(calculoId))
-				.andExpect(jsonPath("$.calculoFormula").value("N*70%"))
+				// Incremento 84: banco tem uma LISTA de cálculos (aqui, um só)
+				.andExpect(jsonPath("$.calculos[0].id").value(calculoId))
+				.andExpect(jsonPath("$.calculos[0].formula").value("N*70%"))
 				.andReturn().getResponse().getHeader("Location");
 
 		mockMvc.perform(get(location).header("Authorization", authHeader))

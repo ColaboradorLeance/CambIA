@@ -101,6 +101,20 @@ class FechamentoExportTests {
 		assertTrue(corpo.length > 100, "PDF gerado parece vazio demais");
 		String assinatura = new String(corpo, 0, 4);
 		assertEquals("%PDF", assinatura);
+
+		// Incremento 83: o Fechamento usa o mesmo exportador dos relatórios — cartões de
+		// destaque, quebras com o rótulo do exportador anterior e rodapé paginado.
+		com.lowagie.text.pdf.PdfReader leitor = new com.lowagie.text.pdf.PdfReader(corpo);
+		com.lowagie.text.pdf.parser.PdfTextExtractor extrator = new com.lowagie.text.pdf.parser.PdfTextExtractor(leitor);
+		StringBuilder paginas = new StringBuilder();
+		for (int pagina = 1; pagina <= leitor.getNumberOfPages(); pagina++) {
+			paginas.append(extrator.getTextFromPage(pagina)).append(' ');
+		}
+		String texto = paginas.toString().replaceAll("\\s+", " ");
+		assertTrue(texto.contains("Fechamento Diário"), texto);
+		assertTrue(texto.contains("Comissão Líquida (R$)"), texto);
+		assertTrue(texto.contains("Quebra por banco"), texto);
+		assertTrue(texto.contains("Página 1 de "), texto);
 	}
 
 	@Test

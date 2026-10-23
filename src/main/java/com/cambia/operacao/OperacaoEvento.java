@@ -34,16 +34,21 @@ class OperacaoEvento {
 	@Column(name = "dados_anteriores", columnDefinition = "TEXT")
 	private String dadosAnteriores;
 
+	// Incremento 81 (K9): qual chave de API agiu; null = ação feita pela tela (sessão).
+	@Column(name = "chave_api_id")
+	private Long chaveApiId;
+
 	protected OperacaoEvento() {
 	}
 
 	OperacaoEvento(Long operacaoId, TipoEventoOperacao tipo, Long usuarioId, Instant criadoEm,
-			String dadosAnteriores) {
+			String dadosAnteriores, Long chaveApiId) {
 		this.operacaoId = operacaoId;
 		this.tipo = tipo;
 		this.usuarioId = usuarioId;
 		this.criadoEm = criadoEm;
 		this.dadosAnteriores = dadosAnteriores;
+		this.chaveApiId = chaveApiId;
 	}
 
 	Long getId() {
@@ -68,6 +73,10 @@ class OperacaoEvento {
 
 	String getDadosAnteriores() {
 		return dadosAnteriores;
+	}
+
+	Long getChaveApiId() {
+		return chaveApiId;
 	}
 
 }

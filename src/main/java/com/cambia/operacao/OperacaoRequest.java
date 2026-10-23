@@ -16,6 +16,9 @@ record OperacaoRequest(
 		String codigoOperacao,
 		@NotNull Long clienteId,
 		@NotNull Long bancoId,
+		// Incremento 84: opcional quando o banco tem um só modelo de cálculo (usa ele);
+		// obrigatório quando tem mais de um — validação no OperacaoService.
+		Long calculoId,
 		@NotBlank String cv,
 		@NotBlank String prCrVir,
 		@NotBlank String fundo,

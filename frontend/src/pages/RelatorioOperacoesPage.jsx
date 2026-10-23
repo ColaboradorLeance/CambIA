@@ -3,8 +3,10 @@ import { api } from "../api/client";
 import StatusBadge from "../components/StatusBadge";
 import LoadingState from "../components/LoadingState";
 import EmptyState from "../components/EmptyState";
+import ModeloCalculo from "../components/ModeloCalculo";
 import { formatarData } from "../utils/data";
 import { formatarMoeda, calcularFundo } from "../utils/formatacao";
+import BotoesExportacao from "../components/BotoesExportacao";
 
 const FILTROS_VAZIOS = {
 	periodo: "HOJE",
@@ -78,7 +80,10 @@ export default function RelatorioOperacoesPage() {
 
 	return (
 		<div>
-			<h1>Relatório de Ordens</h1>
+			<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+				<h1>Relatório de Ordens</h1>
+				<BotoesExportacao caminho="/relatorios/operacoes" query={paraQueryString(filtros)} nomeArquivo="relatorio-ordens" />
+			</div>
 
 			<div className="relatorio-filtros">
 				<label>
@@ -169,6 +174,7 @@ export default function RelatorioOperacoesPage() {
 								<th>Data</th>
 								<th>Cliente</th>
 								<th>Banco</th>
+								<th>Modelo de cálculo</th>
 								<th>C/V</th>
 								<th>Tipo</th>
 								<th>Fundo</th>
@@ -189,6 +195,9 @@ export default function RelatorioOperacoesPage() {
 									<td>{formatarData(op.data)}</td>
 									<td>{nomeCliente(op.clienteId)}</td>
 									<td>{nomeBanco(op.bancoId)}</td>
+									<td>
+										<ModeloCalculo nome={op.calculoNome} formula={op.calculoFormula} />
+									</td>
 									<td>{op.cv}</td>
 									<td>{op.prCrVir}</td>
 									{/* Incremento 75: Fundo é persistido (fora de Pronto aceita qualquer letra

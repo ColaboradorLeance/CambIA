@@ -1,5 +1,6 @@
 package com.cambia.operacao;
 
+import com.cambia.chaveapi.ChaveApiNaRequisicao;
 import java.net.URI;
 import java.util.List;
 
@@ -34,7 +35,8 @@ class OperacaoController {
 	@PostMapping
 	ResponseEntity<OperacaoResponse> criar(@Valid @RequestBody OperacaoRequest request,
 			@AuthenticationPrincipal Usuario usuarioLogado) {
-		Operacao operacao = service.criar(request, usuarioLogado.getId());
+		// Só a criação pode vir de chave de API (K4: nenhum escopo edita, confirma ou cancela).
+		Operacao operacao = service.criar(request, usuarioLogado.getId(), ChaveApiNaRequisicao.idAtual());
 		return ResponseEntity.created(URI.create("/operacoes/" + operacao.getId()))
 				.body(service.toResponse(operacao));
 	}

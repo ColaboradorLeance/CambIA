@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # Imagem única do CambIA: backend (Java), front-end (React) e reverse-proxy HTTPS
 # (nginx) juntos no mesmo container. O banco de dados (Postgres) continua sempre
 # separado — nunca entra nesta imagem (ver README.md e RELEASING.md pro porquê).
@@ -16,7 +17,11 @@ FROM maven:3.9-eclipse-temurin-21 AS backend-build
 WORKDIR /app
 COPY pom.xml .
 COPY src src
-RUN mvn -q -DskipTests package
+# Cache do repositório Maven entre builds (BuildKit): sem ele, TODO build baixava todas as
+# dependências do zero, e uma instabilidade de rede com o Maven Central derrubava o build
+# (visto em 2026-10-23: handshake TLS encerrado após ~20 min). Com o cache, só baixa o que
+# mudou; as tentativas extras cobrem oscilação momentânea.
+RUN --mount=type=cache,target=/root/.m2 mvn -q -DskipTests -Daether.connector.http.retryHandler.count=5 package
 
 # ---- Stage 2: build do front-end -------------------------------------------------
 FROM node:22-alpine AS frontend-build
